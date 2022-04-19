@@ -1,0 +1,333 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use Getopt::Long;
+
+#use Suricata::Monitoring;
+
+sub version {
+	print "suricata_stat_check v. 0.0.1\n";
+}
+
+sub help {
+	&version;
+
+	print '
+
+-m <mode>
+-s <slug>
+-l <log dig>
+-1 <manual>
+-2 <manual>
+-3 <manual>
+-4 <manual>
+-5 <manual>
+-6 <manual>
+-7 <manual>
+-8 <manual>
+-9 <manual>
+-0 <manual>
+-e <eve>
+
+-d <drop percent warn>   Percent of drop packets to warn on.
+                         Default: 0.75%
+-D <drop percent crit>   Percent of dropped packets to critical on.
+                         Default: 1%
+-e <error delta warn>    Error delta to warn on.
+                         Default: 1
+-E <error delta crit>    Error delta to critical on.
+                         Default: 2
+-r <error percent warn>  Percent of drop packets to warn on.
+                         Default: 0.05%
+-R <error percent crit>  Percent of drop packets to warn on.
+                         Default: 0.1%
+
+
+-h           Print help info.
+--help       Print help info.
+-v           Print version info.
+--version    Print version info.
+';
+}
+
+sub instance_name_check {
+	my $name = $_[0];
+
+	if ( !defined($name) ) {
+		return undef;
+	}
+	elsif ( $name eq '' ) {
+		return undef;
+	}
+	elsif ( $name =~ /[\t\n\ \;\/\\\:\"\']/ ) {
+		return undef;
+	}
+
+	return 1;
+}
+
+# get the commandline options
+my $help        = 0;
+my $version     = 0;
+my $slug        = 'single';
+my $mode        = 'single';
+my $single_eve  = '/var/log/suricata/eve.json';
+my $single_name = 'ids';
+my $log_dir     = '/var/log/suricata';
+my $instance_0;
+my $instance_1;
+my $instance_2;
+my $instance_3;
+my $instance_4;
+my $instance_5;
+my $instance_6;
+my $instance_7;
+my $instance_8;
+my $instance_9;
+my $nagios;
+my $drop_percent_warn  = '.75';
+my $drop_percent_crit  = '1';
+my $error_delta_warn   = '1';
+my $error_delta_crit   = '2';
+my $error_percent_warn = '.05';
+my $error_percent_crit = '.1';
+Getopt::Long::Configure('no_ignore_case');
+Getopt::Long::Configure('bundling');
+GetOptions(
+	'version' => \$version,
+	'v'       => \$version,
+	'help'    => \$help,
+	'h'       => \$help,
+	's=s'     => \$slug,
+	'm=s'     => \$mode,
+	'l=s'     => \$log_dir,
+	's=s'     => \$single_eve,
+	'S=s'     => \$single_name,
+	'0=s'     => \$instance_0,
+	'1=s'     => \$instance_1,
+	'2=s'     => \$instance_2,
+	'3=s'     => \$instance_3,
+	'4=s'     => \$instance_4,
+	'5=s'     => \$instance_5,
+	'6=s'     => \$instance_6,
+	'7=s'     => \$instance_7,
+	'8=s'     => \$instance_8,
+	'9=s'     => \$instance_9,
+	'n'       => \$nagios,
+	'd=s'     => $drop_percent_warn,
+	'D=s'     => $drop_percent_crit,
+	'e=s'     => $error_delta_warn,
+	'E=s'     => $error_delta_crit,
+	'r=s'     => $error_percent_warn,
+	'R=r'     => $error_percent_crit,
+);
+
+# print version or help if requested
+if ($help) {
+	&help;
+	exit 42;
+}
+if ($version) {
+	&version;
+	exit 42;
+}
+
+my $instances = {};
+
+if ( $mode eq 'single' ) {
+
+	if ( !-f $single_eve ) {
+		die( '"' . $single_eve . '" does not exist' );
+	}
+
+	if ( !&instance_name_check($single_name) ) {
+		die( '"' . $single_name . '" is not a valid instance name' );
+	}
+
+	$instances->{$single_name} = $single_eve;
+}
+elsif ( $mode eq 'slug' ) {
+	my $dh;
+	my $found = 0;
+	opendir( $dh, $log_dir ) or die( 'Ubable to open dir "' . $log_dir . '"' );
+	while ( readdir($dh) ) {
+		if ( $_ =~ /^$slug-[A-Za-z\-\_0-9]+\.[Jj][Ss][Oo][Nn]$/ ) {
+			my $instance = $_;
+			$instance =~ s/^$slug\-//;
+			$instance =~ s/\.[Jj][Ss][Oo][Nn]$//;
+			$instances->{$instance} = $log_dir . '/' . $_;
+		}
+	}
+	close($dh);
+}
+elsif ( $mode eq 'manual' ) {
+
+	# grab instance from -0
+	if ( defined($instance_0) ) {
+		my ( $instance, $eve ) = split( /\,/, $instance_0, 2 );
+		if ( !defined($eve) ) {
+			die( '"' . $instance_0 . '" does not contain a eve file' );
+		}
+		if ( !-f $eve ) {
+			die( '"' . $eve . '" does not exist' );
+		}
+		if ( !&instance_name_check($instance) ) {
+			die( '"' . $instance . '" is not a valid instance name' );
+		}
+		$instances->{$instance} = $eve;
+	}
+
+	# grab instance from -1
+	if ( defined($instance_1) ) {
+		my ( $instance, $eve ) = split( /\,/, $instance_1, 2 );
+		if ( !defined($eve) ) {
+			die( '"' . $instance_1 . '" does not contain a eve file' );
+		}
+		if ( !-f $eve ) {
+			die( '"' . $eve . '" does not exist' );
+		}
+		if ( !&instance_name_check($instance) ) {
+			die( '"' . $instance . '" is not a valid instance name' );
+		}
+		$instances->{$instance} = $eve;
+	}
+
+	# grab instance from -2
+	if ( defined($instance_2) ) {
+		my ( $instance, $eve ) = split( /\,/, $instance_2, 2 );
+		if ( !defined($eve) ) {
+			die( '"' . $instance_2 . '" does not contain a eve file' );
+		}
+		if ( !-f $eve ) {
+			die( '"' . $eve . '" does not exist' );
+		}
+		if ( !&instance_name_check($instance) ) {
+			die( '"' . $instance . '" is not a valid instance name' );
+		}
+		$instances->{$instance} = $eve;
+	}
+
+	# grab instance from -3
+	if ( defined($instance_3) ) {
+		my ( $instance, $eve ) = split( /\,/, $instance_3, 2 );
+		if ( !defined($eve) ) {
+			die( '"' . $instance_3 . '" does not contain a eve file' );
+		}
+		if ( !-f $eve ) {
+			die( '"' . $eve . '" does not exist' );
+		}
+		if ( !&instance_name_check($instance) ) {
+			die( '"' . $instance . '" is not a valid instance name' );
+		}
+		$instances->{$instance} = $eve;
+	}
+
+	# grab instance from -4
+	if ( defined($instance_4) ) {
+		my ( $instance, $eve ) = split( /\,/, $instance_4, 2 );
+		if ( !defined($eve) ) {
+			die( '"' . $instance_4 . '" does not contain a eve file' );
+		}
+		if ( !-f $eve ) {
+			die( '"' . $eve . '" does not exist' );
+		}
+		if ( !&instance_name_check($instance) ) {
+			die( '"' . $instance . '" is not a valid instance name' );
+		}
+		$instances->{$instance} = $eve;
+	}
+
+	# grab instance from -5
+	if ( defined($instance_5) ) {
+		my ( $instance, $eve ) = split( /\,/, $instance_5, 2 );
+		if ( !defined($eve) ) {
+			die( '"' . $instance_5 . '" does not contain a eve file' );
+		}
+		if ( !-f $eve ) {
+			die( '"' . $eve . '" does not exist' );
+		}
+		if ( !&instance_name_check($instance) ) {
+			die( '"' . $instance . '" is not a valid instance name' );
+		}
+		$instances->{$instance} = $eve;
+	}
+
+	# grab instance from -6
+	if ( defined($instance_6) ) {
+		my ( $instance, $eve ) = split( /\,/, $instance_6, 2 );
+		if ( !defined($eve) ) {
+			die( '"' . $instance_6 . '" does not contain a eve file' );
+		}
+		if ( !-f $eve ) {
+			die( '"' . $eve . '" does not exist' );
+		}
+		if ( !&instance_name_check($instance) ) {
+			die( '"' . $instance . '" is not a valid instance name' );
+		}
+		$instances->{$instance} = $eve;
+	}
+
+	# grab instance from -7
+	if ( defined($instance_7) ) {
+		my ( $instance, $eve ) = split( /\,/, $instance_7, 2 );
+		if ( !defined($eve) ) {
+			die( '"' . $instance_7 . '" does not contain a eve file' );
+		}
+		if ( !-f $eve ) {
+			die( '"' . $eve . '" does not exist' );
+		}
+		if ( !&instance_name_check($instance) ) {
+			die( '"' . $instance . '" is not a valid instance name' );
+		}
+		$instances->{$instance} = $eve;
+	}
+
+	# grab instance from -8
+	if ( defined($instance_8) ) {
+		my ( $instance, $eve ) = split( /\,/, $instance_8, 2 );
+		if ( !defined($eve) ) {
+			die( '"' . $instance_8 . '" does not contain a eve file' );
+		}
+		if ( !-f $eve ) {
+			die( '"' . $eve . '" does not exist' );
+		}
+		if ( !&instance_name_check($instance) ) {
+			die( '"' . $instance . '" is not a valid instance name' );
+		}
+		$instances->{$instance} = $eve;
+	}
+
+	# grab instance from -9
+	if ( defined($instance_9) ) {
+		my ( $instance, $eve ) = split( /\,/, $instance_9, 2 );
+		if ( !defined($eve) ) {
+			die( '"' . $instance_9 . '" does not contain a eve file' );
+		}
+		if ( !-f $eve ) {
+			die( '"' . $eve . '" does not exist' );
+		}
+		if ( !&instance_name_check($instance) ) {
+			die( '"' . $instance . '" is not a valid instance name' );
+		}
+		$instances->{$instance} = $eve;
+	}
+}
+else {
+	die( '"' . $mode . '" is not a understood mode' );
+}
+
+# put together the args hash
+my $args = {
+	mode               => 'librenms',
+	drop_percent_warn  => $drop_percent_warn,
+	drop_percent_crit  => $drop_percent_crit,
+	error_delta_warn   => $error_delta_warn,
+	error_delta_crit   => $error_delta_crit,
+	error_percent_warn => $error_percent_warn,
+	error_percent_crit => $error_percent_crit,
+};
+
+if ($nagios) {
+	$args->{mode} = 'nagios';
+}

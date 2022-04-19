@@ -47,15 +47,30 @@ sub new {
 
 	# init the object
 	my $self = {
-		thresholds {
-			'drop_per_val'    => '1',
-			'error_delta_val' => '1',
-			'error_per_val'   => '1',
-		},
-		max_age => 360,
-		mode    => 'librenms',
+		'drop_percent_warn'  => '.75',
+		'drop_percent_crit'  => '1',
+		'error_delta_warn'   => '1',
+		'error_delta_crit'   => '2',
+		'error_percent_warn' => '0.05',
+		'error_percent_crit' => '0.1',
+		max_age              => 360,
+		mode                 => 'librenms',
 	};
 	bless $self;
+
+	# reel in the threshold values
+	my @thresholds = (
+		'drop_percent_warn',  'drop_percent_crit', 'error_delta_warn', 'error_delta_crit',
+		'error_percent_warn', 'error_percent_crit'
+	);
+	for my $threshold (@thresholds) {
+		if ( defined( $args{$threshold} ) ) {
+			$self->{$threshold} = $args{$threshold};
+			if ( $args{$threshold} !~ /[0-9\.]+/ ) {
+				confess( '"' . $threshold . '" with a value of "' . $args{$threshold} . '" is not numeric' );
+			}
+		}
+	}
 
 	# get the mode and make sure it is valid
 	if (
@@ -253,25 +268,110 @@ sub run {
 						if ( $new_stats->{drop_delta} != 0 ) {
 							$new_stats->{drop_percent}
 								= ( $new_stats->{drop_delta} / $new_stats->{packet_delta} ) * 100;
+							$new_stats->{drop_percent} = sprintf( '%0.5f', $new_stats->{drop_percent} );
 						}
 
 						# find the percent of errored
 						if ( $new_stats->{error_delta} != 0 ) {
 							$new_stats->{error_percent}
 								= ( $new_stats->{error_delta} / $new_stats->{packet_delta} ) * 100;
+							$new_stats->{error_percent} = sprintf( '%0.5f', $new_stats->{error_percent} );
+						}
+
+						# check for drop delta alerts
+						if (   $new_stats->{drop_delta} >= $self->{drop_delta_warn}
+							&& $new_stats->{drop_delta} < $self->{drop_delta_crit} )
+						{
+							$new_stats->{alert} = 1;
+							push( @new_alerts,
+									  $instance
+									. ' drop_delta warning '
+									. $new_stats->{drop_delta} . ' >= '
+									. $self->{drop_delta_warn} );
+						}
+						if ( $new_stats->{drop_delta} >= $self->{drop_delta_crit} ) {
+							$new_stats->{alert} = 2;
+							push( @new_alerts,
+									  $instance
+									. ' drop_delta critical '
+									. $new_stats->{drop_delta} . ' >= '
+									. $self->{drop_delta_crit} );
+						}
+
+						# check for drop percent alerts
+						if (   $new_stats->{drop_percent} >= $self->{drop_percent_warn}
+							&& $new_stats->{drop_percent} < $self->{drop_percent_crit} )
+						{
+							$new_stats->{alert} = 1;
+							push( @new_alerts,
+									  $instance
+									. ' drop_percent warning '
+									. $new_stats->{drop_percent} . ' >= '
+									. $self->{drop_percent_warn} );
+						}
+						if ( $new_stats->{drop_percent} >= $self->{drop_percent_crit} ) {
+							$new_stats->{alert} = 2;
+							push( @new_alerts,
+									  $instance
+									. ' drop_percent critical '
+									. $new_stats->{drop_percent} . ' >= '
+									. $self->{drop_percent_crit} );
+						}
+
+						# check for error delta alerts
+						if (   $new_stats->{error_delta} >= $self->{error_delta_warn}
+							&& $new_stats->{error_delta} < $self->{error_delta_crit} )
+						{
+							$new_stats->{alert} = 1;
+							push( @new_alerts,
+									  $instance
+									. ' error_delta warning '
+									. $new_stats->{error_delta} . ' >= '
+									. $self->{error_delta_warn} );
+						}
+						if ( $new_stats->{error_delta} >= $self->{error_delta_crit} ) {
+							$new_stats->{alert} = 2;
+							push( @new_alerts,
+									  $instance
+									. ' error_delta critical '
+									. $new_stats->{error_delta} . ' >= '
+									. $self->{error_delta_crit} );
+						}
+
+						# check for drop percent alerts
+						if (   $new_stats->{error_percent} >= $self->{error_percent_warn}
+							&& $new_stats->{error_percent} < $self->{error_percent_crit} )
+						{
+							$new_stats->{alert} = 1;
+							push( @new_alerts,
+									  $instance
+									. ' error_percent warning '
+									. $new_stats->{error_percent} . ' >= '
+									. $self->{error_percent_warn} );
+						}
+						if ( $new_stats->{error_percent} >= $self->{error_percent_crit} ) {
+							$new_stats->{alert} = 2;
+							push( @new_alerts,
+									  $instance
+									. ' error_percent critical '
+									. $new_stats->{error_percent} . ' >= '
+									. $self->{error_percent_crit} );
 						}
 
 						# check for alert status
-						if ( $new_stats->{alert} ) {
-							$to_return->{alert}       = 1;
+						if ( $new_stats->{alert} > $to_return->{alert} ) {
+							$to_return->{alert}       = $new_stats->{alert};
 							$new_stats->{alertString} = join( "\n", @new_alerts );
 							push( @alerts, @new_alerts );
 						}
 					}
+
+					$to_return->{data}{$instance} = $new_stats;
 				}
 
 			};
 		}
+
 	}
 
 	# join any found alerts into the string
