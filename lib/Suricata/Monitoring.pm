@@ -48,10 +48,9 @@ sub new {
 	# init the object
 	my $self = {
 		thresholds {
-			'drop_per_eq'     => 'gte',
-			'error_delta_eq'  => 'gte',
 			'drop_per_val'    => '1',
 			'error_delta_val' => '1',
+			'error_per_val'   => '1',
 		},
 		max_age => 360,
 		mode    => 'librenms',
@@ -94,34 +93,6 @@ sub new {
 			'"' . $args{cache_dir} . '" does not exist or is not a directory and could not be create... ' . $@ );
 	}
 
-	# used for check if everything is valid for threshold settings
-	my $equality_values = { 'lt' => '', 'lte' => '', 'gt' => '', 'gte' => '' };
-	my @equality_keys   = ( 'drop_per_eq',  'drop_d_eq',  'error_per_eq',  'error_delta_eq' );
-	my @threshold_keys  = ( 'drop_per_val', 'drop_d_val', 'error_per_val', 'error_delta_val' );
-
-	if ( defined( $args{thresholds} ) ) {
-
-		# make sure all the equality values are valid
-		foreach my $current_key (@equality_keys) {
-			if ( defined( $args{thresholds}{$current_key} ) ) {
-				if ( !defined( $equality_values->{ $args{thresholds}{$current_key} } ) ) {
-					confess( '"' . $args{thresholds}{$current_key} . '" for a equality value' );
-				}
-				$self->{thresholds}{$current_key} = $args{thresholds}{$current_key};
-			}
-		}
-
-		# make sure all the threshold keys are are integers
-		foreach my $current_key (@threshold_keys) {
-			if ( defined( $args{thresholds}{$current_key} ) ) {
-				if ( $args{thresholds}{$current_key} !~ /^[0123456789]+$/ ) {
-					confess( '"' . $args{thresholds}{$current_key} . '" for "' . $current_key . '" is not numeric' );
-				}
-				$self->{thresholds}{$current_key} = $args{thresholds}{$current_key};
-			}
-		}
-	}
-
 	return $self;
 }
 
@@ -137,10 +108,10 @@ sub run {
 	my $self = $_[0];
 
 	# this will be returned
-	my $to_return = { instances => {}, version => 1, error => '0', errorString => '' };
+	my $to_return = { data => {}, version => 1, error => '0', errorString => '', alert => '0', alertString => '' };
 
 	my $previous;
-	my $previous_file = $self->{cache_dir} . 'stats.json';
+	my $previous_file = $self->{cache_dir} . '/stats.json';
 	if ( -f $previous_file ) {
 		#
 		eval {
@@ -162,6 +133,7 @@ sub run {
 
 	# process the files for each instance
 	my @instances = keys( %{ $self->{files} } );
+	my @alerts;
 	foreach my $instance (@instances) {
 
 		# open the file for reading it backwards
@@ -202,38 +174,123 @@ sub run {
 					&& $json->{event_type} eq 'stats' )
 				{
 					# we can stop processing now as this is what we were looking for
-					$process_it=0;
+					$process_it = 0;
 
-					my $new_stats={
-								   packets=>$json->{stats}{capture}{kernel_packets},
-								   dropped=>$json->{stats}{capture}{kernel_drops},
-								   errors=>$json->{stats}{capture}{errors},
-								   p_change=>0,
-								   d_change=>0,
-								   e_change=>0,
-								   d_percent=>0,
-								   e_percent=>0,
-								   bytes=>$json->{stats}{decoder}{btyes},
-								   dpackets=>$json->{stats}{decoder}{packets},
-								   invalid=>$json->{stats}{decoder}{btyes},
-								   ipv4=>$json->{stats}{decoder}{ipv4},
-								   ipv6=>$json->{stats}{decoder}{ipv6},
-								   udp=>$json->{stats}{decoder}{udp},
-								   tcp=>$json->{stats}{decoder}{tcp},
-								   avg_pkg_size=>$json->{stats}{decoder}{avg_pkg_size},
-								   max_pkg_size=>$json->{stats}{decoder}{max_pkg_size},
-								   flows=>$json->{stats}{app_layer}{flows},
+					# holds the found new alerts
+					my @new_alerts;
 
+					my $new_stats = {
+						uptime           => $json->{stats}{uptime},
+						packets          => $json->{stats}{capture}{kernel_packets},
+						dropped          => $json->{stats}{capture}{kernel_drops},
+						errors           => $json->{stats}{capture}{errors},
+						packet_delta     => 0,
+						drop_delta       => 0,
+						error_delta      => 0,
+						drop_percent     => 0,
+						error_percent    => 0,
+						bytes            => $json->{stats}{decoder}{btyes},
+						dec_packets      => $json->{stats}{decoder}{packets},
+						dec_invalid      => $json->{stats}{decoder}{btyes},
+						dec_ipv4         => $json->{stats}{decoder}{ipv4},
+						dec_ipv6         => $json->{stats}{decoder}{ipv6},
+						dec_udp          => $json->{stats}{decoder}{udp},
+						dec_tcp          => $json->{stats}{decoder}{tcp},
+						dec_avg_pkg_size => $json->{stats}{decoder}{avg_pkg_size},
+						dec_max_pkg_size => $json->{stats}{decoder}{max_pkg_size},
+						f_tcp            => $json->{stats}{flow}{tcp},
+						f_udp            => $json->{stats}{flow}{udp},
+						f_icmpv4         => $json->{stats}{flow}{icmpv4},
+						f_icmpv6         => $json->{stats}{flow}{icmpv6},
+						f_memuse         => $json->{stats}{flow}{memuse},
+						ftp_memuse       => $json->{stats}{ftp}{memuse},
+						http_memuse      => $json->{stats}{http}{memuse},
+						tcp_memuse       => $json->{stats}{tcp}{memuse},
+						tcp_reass_memuse => $json->{stats}{tcp}{reassembly_memuse},
+						alert            => 0,
+						alert_string     => '',
+					};
+					foreach my $flow_key ( keys( %{ $json->{stats}{app_layer}{flows} } ) ) {
+						$new_stats->{ 'af_' . $flow_key } = $json->{stats}{app_layer}{flows}{$flow_key};
+					}
+					foreach my $tx_key ( keys( %{ $json->{stats}{app_layer}{tx} } ) ) {
+						$new_stats->{ 'at_' . $tx_key } = $json->{stats}{app_layer}{flows}{$tx_key};
+					}
+
+					# begin handling this if we have previous values
+					if (   defined($previous)
+						&& defined( $previous->{data}{$instance} )
+						&& defined( $previous->{data}{$instance}{packets} )
+						&& defined( $previous->{data}{$instance}{bytes} )
+						&& defined( $previous->{data}{$instance}{dropped} )
+						&& defined( $previous->{data}{$instance}{error} ) )
+					{
+						# find the change for packet count
+						if ( $new_stats->{packets} < $previous->{data}{$instance}{packets} ) {
+							$new_stats->{packet_delta} = $new_stats->{packets};
+						}
+						else {
+							$new_stats->{packet_delta} = $new_stats->{packets} - $previous->{data}{$instance}{packets};
+						}
+
+						# find the change for drop count
+						if ( $new_stats->{dropped} < $previous->{data}{$instance}{dropped} ) {
+							$new_stats->{drop_delta} = $new_stats->{dropped};
+						}
+						else {
+							$new_stats->{drop_delta} = $new_stats->{dropped} - $previous->{data}{$instance}{dropped};
+						}
+
+						# find the change for errors count
+						if ( $new_stats->{errors} < $previous->{data}{$instance}{errors} ) {
+							$new_stats->{error_delta} = $new_stats->{errors};
+						}
+						else {
+							$new_stats->{error_delta} = $new_stats->{errors} - $previous->{data}{$instance}{errors};
+						}
+
+						# find the percent of dropped
+						if ( $new_stats->{drop_delta} != 0 ) {
+							$new_stats->{drop_percent}
+								= ( $new_stats->{drop_delta} / $new_stats->{packet_delta} ) * 100;
+						}
+
+						# find the percent of errored
+						if ( $new_stats->{error_delta} != 0 ) {
+							$new_stats->{error_percent}
+								= ( $new_stats->{error_delta} / $new_stats->{packet_delta} ) * 100;
+						}
+
+						# check for alert status
+						if ( $new_stats->{alert} ) {
+							$to_return->{alert}       = 1;
+							$new_stats->{alertString} = join( "\n", @new_alerts );
+							push( @alerts, @new_alerts );
+						}
+					}
 				}
-			}
+
+			};
 		}
 	}
 
-	return $to_return;
-}
+	# join any found alerts into the string
+	$to_return->{alertsString} = join( "\n", @alerts );
 
-sub results_to_string {
-	my $self = $_[0];
+	# write the cache file on out
+	eval {
+		my $new_cache = encode_json($to_return);
+		open( my $fh, '>', $previous_file );
+		print $fh $new_cache;
+		close($fh);
+	};
+	if ($@) {
+		$to_return->{error}       = '1';
+		$to_return->{errorString} = 'Failed to write new cache JSON file, "' . $previous_file . '".... ' . $@;
+		$self->{results}          = $to_return;
+	}
+
+	return $to_return;
 }
 
 =head1 AUTHOR
