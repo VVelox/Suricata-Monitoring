@@ -224,11 +224,13 @@ sub run {
 						uptime           => $json->{stats}{uptime},
 						packets          => $json->{stats}{capture}{kernel_packets},
 						dropped          => $json->{stats}{capture}{kernel_drops},
+						ifdropped        => $json->{stats}{capture}{kernel_ifdrops},
 						errors           => $json->{stats}{capture}{errors},
 						packet_delta     => 0,
 						drop_delta       => 0,
 						error_delta      => 0,
 						drop_percent     => 0,
+						ifdrop_percent   => 0,
 						error_percent    => 0,
 						bytes            => $json->{stats}{decoder}{btyes},
 						dec_packets      => $json->{stats}{decoder}{packets},
@@ -258,13 +260,22 @@ sub run {
 						$new_stats->{ 'at_' . $tx_key } = $json->{stats}{app_layer}{tx}{$tx_key};
 					}
 
+					# some this is a bit variable as to which will be present based on the system
+					# af-packet = error
+					# pcap = ifdrops
+					my @zero_if_undef = ( 'errors', 'ifdropped' );
+					foreach my $undef_check(@zero_if_undef) {
+						if (!defined( $new_stats->{$undef_check} )) {
+							$new_stats->{$undef_check}=1;
+						}
+					}
+
 					# begin handling this if we have previous values
 					if (   defined($previous)
 						&& defined( $previous->{data}{$instance} )
 						&& defined( $previous->{data}{$instance}{packets} )
 						&& defined( $previous->{data}{$instance}{bytes} )
-						&& defined( $previous->{data}{$instance}{dropped} )
-						&& defined( $previous->{data}{$instance}{error} ) )
+						&& defined( $previous->{data}{$instance}{dropped} ) )
 					{
 						# find the change for packet count
 						if ( $new_stats->{packets} < $previous->{data}{$instance}{packets} ) {
@@ -282,6 +293,15 @@ sub run {
 							$new_stats->{drop_delta} = $new_stats->{dropped} - $previous->{data}{$instance}{dropped};
 						}
 
+						# find the change for ifdrop count
+						if ( $new_stats->{ifdropped} < $previous->{data}{$instance}{ifdropped} ) {
+							$new_stats->{ifdrop_delta} = $new_stats->{ifdropped};
+						}
+						else {
+							$new_stats->{ifdrop_delta}
+								= $new_stats->{ifdropped} - $previous->{data}{$instance}{ifdropped};
+						}
+
 						# find the change for errors count
 						if ( $new_stats->{errors} < $previous->{data}{$instance}{errors} ) {
 							$new_stats->{error_delta} = $new_stats->{errors};
@@ -295,6 +315,13 @@ sub run {
 							$new_stats->{drop_percent}
 								= ( $new_stats->{drop_delta} / $new_stats->{packet_delta} ) * 100;
 							$new_stats->{drop_percent} = sprintf( '%0.5f', $new_stats->{drop_percent} );
+						}
+
+						# find the percent of dropped
+						if ( $new_stats->{ifdrop_delta} != 0 ) {
+							$new_stats->{ifdrop_percent}
+								= ( $new_stats->{ifdrop_delta} / $new_stats->{ifpacket_delta} ) * 100;
+							$new_stats->{ifdrop_percent} = sprintf( '%0.5f', $new_stats->{ifdrop_percent} );
 						}
 
 						# find the percent of errored
@@ -324,6 +351,26 @@ sub run {
 									. $self->{drop_delta_crit} );
 						}
 
+						# check for ifdrop delta alerts
+						if (   $new_stats->{ifdrop_delta} >= $self->{drop_delta_warn}
+							&& $new_stats->{ifdrop_delta} < $self->{drop_delta_crit} )
+						{
+							$new_stats->{alert} = 1;
+							push( @new_alerts,
+									  $instance
+									. ' ifdrop_delta warning '
+									. $new_stats->{ifdrop_delta} . ' >= '
+									. $self->{drop_delta_warn} );
+						}
+						if ( $new_stats->{ifdrop_delta} >= $self->{drop_delta_crit} ) {
+							$new_stats->{alert} = 2;
+							push( @new_alerts,
+									  $instance
+									. ' ifdrop_delta critical '
+									. $new_stats->{ifdrop_delta} . ' >= '
+									. $self->{ifdrop_delta_crit} );
+						}
+
 						# check for drop percent alerts
 						if (   $new_stats->{drop_percent} >= $self->{drop_percent_warn}
 							&& $new_stats->{drop_percent} < $self->{drop_percent_crit} )
@@ -341,6 +388,26 @@ sub run {
 									  $instance
 									. ' drop_percent critical '
 									. $new_stats->{drop_percent} . ' >= '
+									. $self->{drop_percent_crit} );
+						}
+
+						# check for drop percent alerts
+						if (   $new_stats->{ifdrop_percent} >= $self->{drop_percent_warn}
+							&& $new_stats->{ifdrop_percent} < $self->{drop_percent_crit} )
+						{
+							$new_stats->{alert} = 1;
+							push( @new_alerts,
+									  $instance
+									. ' ifdrop_percent warning '
+									. $new_stats->{ifdrop_percent} . ' >= '
+									. $self->{drop_percent_warn} );
+						}
+						if ( $new_stats->{ifdrop_percent} >= $self->{drop_percent_crit} ) {
+							$new_stats->{alert} = 2;
+							push( @new_alerts,
+									  $instance
+									. ' ifdrop_percent critical '
+									. $new_stats->{ifdrop_percent} . ' >= '
 									. $self->{drop_percent_crit} );
 						}
 
@@ -457,7 +524,7 @@ sub print_output {
 		print $alerts. "\n";
 	}
 	else {
-		print encode_json( $self->{results} );
+		print encode_json( $self->{results} ) . "\n";
 	}
 }
 
