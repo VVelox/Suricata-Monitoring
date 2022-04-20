@@ -228,6 +228,7 @@ sub run {
 						errors           => $json->{stats}{capture}{errors},
 						packet_delta     => 0,
 						drop_delta       => 0,
+						ifdrop_delta     => 0,
 						error_delta      => 0,
 						drop_percent     => 0,
 						ifdrop_percent   => 0,
@@ -330,46 +331,6 @@ sub run {
 							$new_stats->{error_percent}
 								= ( $new_stats->{error_delta} / $new_stats->{packet_delta} ) * 100;
 							$new_stats->{error_percent} = sprintf( '%0.5f', $new_stats->{error_percent} );
-						}
-
-						# check for drop delta alerts
-						if (   $new_stats->{drop_delta} >= $self->{drop_delta_warn}
-							&& $new_stats->{drop_delta} < $self->{drop_delta_crit} )
-						{
-							$new_stats->{alert} = 1;
-							push( @new_alerts,
-									  $instance
-									. ' drop_delta warning '
-									. $new_stats->{drop_delta} . ' >= '
-									. $self->{drop_delta_warn} );
-						}
-						if ( $new_stats->{drop_delta} >= $self->{drop_delta_crit} ) {
-							$new_stats->{alert} = 2;
-							push( @new_alerts,
-									  $instance
-									. ' drop_delta critical '
-									. $new_stats->{drop_delta} . ' >= '
-									. $self->{drop_delta_crit} );
-						}
-
-						# check for ifdrop delta alerts
-						if (   $new_stats->{ifdrop_delta} >= $self->{drop_delta_warn}
-							&& $new_stats->{ifdrop_delta} < $self->{drop_delta_crit} )
-						{
-							$new_stats->{alert} = 1;
-							push( @new_alerts,
-									  $instance
-									. ' ifdrop_delta warning '
-									. $new_stats->{ifdrop_delta} . ' >= '
-									. $self->{drop_delta_warn} );
-						}
-						if ( $new_stats->{ifdrop_delta} >= $self->{drop_delta_crit} ) {
-							$new_stats->{alert} = 2;
-							push( @new_alerts,
-									  $instance
-									. ' ifdrop_delta critical '
-									. $new_stats->{ifdrop_delta} . ' >= '
-									. $self->{ifdrop_delta_crit} );
 						}
 
 						# check for drop percent alerts
