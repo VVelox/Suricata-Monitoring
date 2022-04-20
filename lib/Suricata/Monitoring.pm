@@ -149,6 +149,7 @@ sub run {
 	# process the files for each instance
 	my @instances = keys( %{ $self->{files} } );
 	my @alerts;
+	my $current_till = $till;
 	foreach my $instance (@instances) {
 
 		# open the file for reading it backwards
@@ -169,17 +170,42 @@ sub run {
 		my $process_it = 1;
 		my $line       = $bw->readline;
 		my $found;
+
 		while ( $process_it
 			&& defined($line) )
 		{
 			eval {
 				my $json      = decode_json($line);
 				my $timestamp = $json->{timestamp};
+
+				# if current till is not set, set it
+				if ( !defined($current_till) ) {
+
+					# get the number of hours
+					my $hours = $timestamp;
+					$hours =~ s/.[-+]//g;
+					$hours =~ s/^0//;
+					$hours =~ s/[0-9][0-9]$//;
+
+					# get the number of minutes
+					my $minutes = $timestamp;
+					$minutes =~ s/.[-+]//g;
+					$minutes =~ s/^[0-9][0-9]//;
+
+					my $second_diff = ( $minutes * 60 ) + ( $hours * 60 * 60 );
+
+					if ( $timestamp =~ /\+/ ) {
+						$current_till = $till + $second_diff;
+					}
+					else {
+						$current_till = $till - $second_diff;
+					}
+				}
 				$timestamp =~ s/\..*$//;
 				my $t = Time::Piece->strptime( $timestamp, '%Y-%m-%dT%H:%M:%S' );
 
 				# stop process further lines as we've hit the oldest we care about
-				if ( $t->epoch < $till ) {
+				if ( $t->epoch < $current_till ) {
 					$process_it = 0;
 				}
 
@@ -229,7 +255,7 @@ sub run {
 						$new_stats->{ 'af_' . $flow_key } = $json->{stats}{app_layer}{flows}{$flow_key};
 					}
 					foreach my $tx_key ( keys( %{ $json->{stats}{app_layer}{tx} } ) ) {
-						$new_stats->{ 'at_' . $tx_key } = $json->{stats}{app_layer}{flows}{$tx_key};
+						$new_stats->{ 'at_' . $tx_key } = $json->{stats}{app_layer}{tx}{$tx_key};
 					}
 
 					# begin handling this if we have previous values
