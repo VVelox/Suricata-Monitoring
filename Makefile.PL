@@ -10,6 +10,7 @@ my %WriteMakefileArgs = (
 	ABSTRACT_FROM      => 'lib/Suricata/Monitoring.pm',
 	LICENSE            => 'artistic_2',
 	MIN_PERL_VERSION   => '5.006',
+	INST_SCRIPT        => 'bin',
 	CONFIGURE_REQUIRES => {
 		'ExtUtils::MakeMaker' => '0',
 	},
@@ -24,8 +25,18 @@ my %WriteMakefileArgs = (
 		'File::Slurp'         => '0',
 		'Time::Piece'         => '0',
 	},
-	dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
-	clean => { FILES    => 'Suricata-Monitoring-*' },
+	dist       => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
+	clean      => { FILES    => 'Suricata-Monitoring-*' },
+	META_MERGE => {
+		"meta-spec" => { version => 2 },
+		resources   => {
+			repository => {
+				type => 'git',
+				url  => 'git@github.com:VVelox/Suricata-Monitoring.git',
+				web  => 'https://github.com/VVelox/Suricata-Monitoring',
+			},
+		},
+	}
 );
 
 # Compatibility with old versions of ExtUtils::MakeMaker

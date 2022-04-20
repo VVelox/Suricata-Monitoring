@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use Getopt::Long;
 
-#use Suricata::Monitoring;
+use Suricata::Monitoring;
 
 sub version {
 	print "suricata_stat_check v. 0.0.1\n";
@@ -15,20 +15,30 @@ sub help {
 
 	print '
 
--m <mode>
--s <slug>
--l <log dig>
--1 <manual>
--2 <manual>
--3 <manual>
--4 <manual>
--5 <manual>
--6 <manual>
--7 <manual>
--8 <manual>
--9 <manual>
--0 <manual>
--e <eve>
+-m <mode>                Mode to run in.
+                         Default: single
+
+-s <eve>                 Eve file for use with single mode.
+                         Default: /var/log/suricata/eve.json
+-S <instance name>       Instance name to use in single mode.
+                         Default: ids
+
+-s <slug>                The slug to use in slug mode.
+                         Default: alert
+-l <log dig>             Log directory for slug mode.
+                         Default: /var/log/suricata
+
+-0 <manual>              A file to use in manual mode.
+-1 <manual>              A file to use in manual mode.
+-2 <manual>              A file to use in manual mode.
+-3 <manual>              A file to use in manual mode.
+-4 <manual>              A file to use in manual mode.
+-5 <manual>              A file to use in manual mode.
+-6 <manual>              A file to use in manual mode.
+-7 <manual>              A file to use in manual mode.
+-8 <manual>              A file to use in manual mode.
+-9 <manual>              A file to use in manual mode.
+-0 <manual>              A file to use in manual mode.
 
 -d <drop percent warn>   Percent of drop packets to warn on.
                          Default: 0.75%
@@ -43,11 +53,30 @@ sub help {
 -R <error percent crit>  Percent of drop packets to warn on.
                          Default: 0.1%
 
+-n                       Run as a nagios check style instead of LibreNMS.
 
--h           Print help info.
---help       Print help info.
--v           Print version info.
---version    Print version info.
+-h                       Print help info.
+--help                   Print help info.
+-v                       Print version info.
+--version                Print version info.
+
+
+* Modes
+
+- single :: Use the specified eve file, -e, and the specified instance
+  name, -i.
+
+- slug :: Check the dir specified, -l. for files starting with the
+  slug, -s. The files must match
+  //^$slug\-[A-Za-z\_\-]\.[Jj][Ss][Oo][Nn]$//. The instance name is formed
+  by removing //^$slug\-/// and //\.[Jj][Ss][Oo][Nn]$//. So
+  "alert-ids.json" becomes "ids".
+
+- manual :: Use the files specified via -0 to -9 to specify instance
+  names and files. The value taken by each of those is comma seperated
+  with the first part being the instance name and the second being the
+  eve file. So "inet,/var/log/suricata/inet.json" would be a instance
+  name of "inet" with a eve file of "/var/log/suricata/inet.json".
 ';
 }
 
@@ -115,12 +144,12 @@ GetOptions(
 	'8=s'     => \$instance_8,
 	'9=s'     => \$instance_9,
 	'n'       => \$nagios,
-	'd=s'     => $drop_percent_warn,
-	'D=s'     => $drop_percent_crit,
-	'e=s'     => $error_delta_warn,
-	'E=s'     => $error_delta_crit,
-	'r=s'     => $error_percent_warn,
-	'R=r'     => $error_percent_crit,
+	'd=s'     => \$drop_percent_warn,
+	'D=s'     => \$drop_percent_crit,
+	'e=s'     => \$error_delta_warn,
+	'E=s'     => \$error_delta_crit,
+	'r=s'     => \$error_percent_warn,
+	'R=s'     => \$error_percent_crit,
 );
 
 # print version or help if requested
@@ -325,9 +354,17 @@ my $args = {
 	error_delta_warn   => $error_delta_warn,
 	error_delta_crit   => $error_delta_crit,
 	error_percent_warn => $error_percent_warn,
-	error_percent_crit => $error_percent_crit,
+			error_percent_crit => $error_percent_crit,
+			files=>$instances,
 };
 
 if ($nagios) {
 	$args->{mode} = 'nagios';
 }
+
+my $sm=Suricata::Monitoring->new($args);
+my $returned=$sm->run;
+$sm->print_output;
+exit $returned->{alert};
+
+
