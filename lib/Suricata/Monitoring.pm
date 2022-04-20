@@ -24,18 +24,77 @@ our $VERSION = '0.0.1';
 
 =head1 SYNOPSIS
 
-Quick summary of what the module does.
-
-Perhaps a little code snippet.
-
     use Suricata::Monitoring;
 
-    my $foo = Suricata::Monitoring->new();
-    ...
+    my $args = {
+        mode               => 'librenms',
+        drop_percent_warn  => .75;
+        drop_percent_crit  => 1,
+        error_delta_warn   => 1,
+        error_delta_crit   => 2,
+        error_percent_warn => .05,
+        error_percent_crit => .1,
+        files=>{
+               'ids'=>'/var/log/suricata/alert-ids.json',
+               'foo'=>'/var/log/suricata/alert-foo.json',
+               },
+    };
+
+    my $sm=Suricata::Monitoring->new( $args );
+    my $returned=$sm->run;
+    $sm->print;
+    exit $returned->{alert};
 
 =head1 METHODS
 
 =head2 new
+
+Initiate the object.
+
+The args are taken as a hash ref. The keys are documented as below.
+
+The only must have is 'files'.
+
+    - mode :: Wether the print_output output should be for Nagios or LibreNMS.
+      - value :: 'librenms' or 'nagios'
+      - Default :: librenms
+    
+    - drop_percent_warn :: Drop percent warning threshold.
+      - Default :: .75;
+	
+    - drop_percent_crit :: Drop percent critical threshold.
+      - Default :: 1
+	
+    - error_delta_warn :: Error delta warning threshold.
+      - Default :: 1
+    
+    - error_delta_crit :: Error delta critical threshold.
+      - Default :: 2
+    
+    - error_percent_warn :: Error percent warning threshold.
+      - Default :: .05
+    
+    - error_percent_crit :: Error percent critical threshold.
+      - Default :: .1
+    
+    - files :: A hash with the keys being the instance name and the values
+      being the Eve files to read.
+
+    my $args = {
+        mode               => 'librenms',
+        drop_percent_warn  => .75;
+        drop_percent_crit  => 1,
+        error_delta_warn   => 1,
+        error_delta_crit   => 2,
+        error_percent_warn => .05,
+        error_percent_crit => .1,
+        files=>{
+               'ids'=>'/var/log/suricata/alert-ids.json',
+               'foo'=>'/var/log/suricata/alert-foo.json',
+               },
+    };
+
+    my $sm=Suricata::Monitoring->new( $args );
 
 =cut
 
@@ -116,6 +175,8 @@ sub new {
 This runs it and collects the data. Also updates the cache.
 
 This will return a LibreNMS style hash.
+
+    my $returned=$sm->run;
 
 =cut
 
@@ -436,7 +497,7 @@ sub run {
 	eval {
 		my $new_cache = encode_json($to_return);
 		open( my $fh, '>', $previous_file );
-		print $fh $new_cache;
+		print $fh $new_cache."\n";
 		close($fh);
 	};
 	if ($@) {
@@ -460,6 +521,10 @@ sub run {
 }
 
 =head2 print_output
+
+Prints the output.
+
+    $sm->print_output;
 
 =cut
 
