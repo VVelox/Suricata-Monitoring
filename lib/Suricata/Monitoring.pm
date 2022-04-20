@@ -388,16 +388,18 @@ sub run {
 		$to_return->{error}       = '1';
 		$to_return->{alert}       = '3';
 		$to_return->{errorString} = 'Failed to write new cache JSON file, "' . $previous_file . '".... ' . $@;
-		# set the nagious style alert stuff
-		$to_return->{alert}       = '3';
-		if ($to_return->{alertString} eq '') {
-			$to_return->{alertString}=$to_return->{errorString};
-		}else {
-			$to_return->{alertString}=$to_return->{errorString}."\n".$to_return->{alertString};
-		}
 
-		$self->{results}          = $to_return;
+		# set the nagious style alert stuff
+		$to_return->{alert} = '3';
+		if ( $to_return->{alertString} eq '' ) {
+			$to_return->{alertString} = $to_return->{errorString};
+		}
+		else {
+			$to_return->{alertString} = $to_return->{errorString} . "\n" . $to_return->{alertString};
+		}
 	}
+
+	$self->{results} = $to_return;
 
 	return $to_return;
 }
@@ -406,26 +408,30 @@ sub run {
 
 =cut
 
-sub print_output{
-	my $self=$_[0];
+sub print_output {
+	my $self = $_[0];
 
-	if ($self->{mode} eq 'nagios') {
-		if ($self->{results}{alert} eq '0') {
+	if ( $self->{mode} eq 'nagios' ) {
+		if ( $self->{results}{alert} eq '0' ) {
 			print "OK - no alerts\n";
 			return;
-		}elsif ($self->{results}{alert} eq '1') {
+		}
+		elsif ( $self->{results}{alert} eq '1' ) {
 			print 'WARNING - ';
-		}elsif ($self->{results}{alert} eq '2') {
+		}
+		elsif ( $self->{results}{alert} eq '2' ) {
 			print 'CRITICAL - ';
-		}elsif ($self->{results}{alert} eq '3') {
+		}
+		elsif ( $self->{results}{alert} eq '3' ) {
 			print 'UNKNOWN - ';
 		}
-		my $alerts=$self->{results}{alertString};
+		my $alerts = $self->{results}{alertString};
 		chomp($alerts);
-		$alerts=s/\n/\, /g;
-		print $alerts."\n";
-	}else {
-		print encode_json($self->{results});
+		$alerts = s/\n/\, /g;
+		print $alerts. "\n";
+	}
+	else {
+		print encode_json( $self->{results} );
 	}
 }
 
