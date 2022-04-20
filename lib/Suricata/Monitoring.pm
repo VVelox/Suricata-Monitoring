@@ -12,7 +12,7 @@ use Time::Piece;
 
 =head1 NAME
 
-Suricata::Monitoring - The great new Suricata::Monitoring!
+Suricata::Monitoring - LibreNMS JSON SNMP extend and Nagios style check for Suricata stats
 
 =head1 VERSION
 
