@@ -167,7 +167,7 @@ sub run {
 
 		#
 		my $process_it = 1;
-		my $line       = bw->readline;
+		my $line       = $bw->readline;
 		my $found;
 		while ( $process_it
 			&& defined($line) )
