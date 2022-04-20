@@ -149,7 +149,7 @@ sub run {
 	# process the files for each instance
 	my @instances = keys( %{ $self->{files} } );
 	my @alerts;
-	my $current_till = $till;
+	my $current_till;
 	foreach my $instance (@instances) {
 
 		# open the file for reading it backwards
@@ -183,13 +183,13 @@ sub run {
 
 					# get the number of hours
 					my $hours = $timestamp;
-					$hours =~ s/.[-+]//g;
+					$hours =~ s/.*[-+]//g;
 					$hours =~ s/^0//;
 					$hours =~ s/[0-9][0-9]$//;
 
 					# get the number of minutes
 					my $minutes = $timestamp;
-					$minutes =~ s/.[-+]//g;
+					$minutes =~ s/.*[-+]//g;
 					$minutes =~ s/^[0-9][0-9]//;
 
 					my $second_diff = ( $minutes * 60 ) + ( $hours * 60 * 60 );
@@ -232,15 +232,15 @@ sub run {
 						drop_percent     => 0,
 						ifdrop_percent   => 0,
 						error_percent    => 0,
-						bytes            => $json->{stats}{decoder}{btyes},
-						dec_packets      => $json->{stats}{decoder}{packets},
-						dec_invalid      => $json->{stats}{decoder}{btyes},
+						bytes            => $json->{stats}{decoder}{bytes},
+						dec_packets      => $json->{stats}{decoder}{pkts},
+						dec_invalid      => $json->{stats}{decoder}{invalid},
 						dec_ipv4         => $json->{stats}{decoder}{ipv4},
 						dec_ipv6         => $json->{stats}{decoder}{ipv6},
 						dec_udp          => $json->{stats}{decoder}{udp},
 						dec_tcp          => $json->{stats}{decoder}{tcp},
-						dec_avg_pkg_size => $json->{stats}{decoder}{avg_pkg_size},
-						dec_max_pkg_size => $json->{stats}{decoder}{max_pkg_size},
+						dec_avg_pkt_size => $json->{stats}{decoder}{avg_pkt_size},
+						dec_max_pkt_size => $json->{stats}{decoder}{max_pkt_size},
 						f_tcp            => $json->{stats}{flow}{tcp},
 						f_udp            => $json->{stats}{flow}{udp},
 						f_icmpv4         => $json->{stats}{flow}{icmpv4},
@@ -253,6 +253,7 @@ sub run {
 						alert            => 0,
 						alert_string     => '',
 					};
+
 					foreach my $flow_key ( keys( %{ $json->{stats}{app_layer}{flows} } ) ) {
 						$new_stats->{ 'af_' . $flow_key } = $json->{stats}{app_layer}{flows}{$flow_key};
 					}
@@ -264,9 +265,9 @@ sub run {
 					# af-packet = error
 					# pcap = ifdrops
 					my @zero_if_undef = ( 'errors', 'ifdropped' );
-					foreach my $undef_check(@zero_if_undef) {
-						if (!defined( $new_stats->{$undef_check} )) {
-							$new_stats->{$undef_check}=1;
+					foreach my $undef_check (@zero_if_undef) {
+						if ( !defined( $new_stats->{$undef_check} ) ) {
+							$new_stats->{$undef_check} = 1;
 						}
 					}
 
