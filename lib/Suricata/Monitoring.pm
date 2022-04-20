@@ -76,7 +76,7 @@ sub new {
 	if (
 		defined( $args{mode} )
 		&& (   ( $args{mode} ne 'librenms' )
-			|| ( $args{mode} ne 'nagios' ) )
+			&& ( $args{mode} ne 'nagios' ) )
 		)
 	{
 		confess( '"' . $args{mode} . '" is not a understood mode' );
