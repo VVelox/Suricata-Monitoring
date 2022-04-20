@@ -594,6 +594,14 @@ L<https://metacpan.org/release/Suricata-Monitoring>
 =back
 
 
+=head * Git
+
+L<git@github.com:VVelox/Suricata-Monitoring.git>
+
+=item * Web
+
+L<https://github.com/VVelox/Suricata-Monitoring>
+
 =head1 ACKNOWLEDGEMENTS
 
 

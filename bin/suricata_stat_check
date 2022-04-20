@@ -360,6 +360,7 @@ if ($version) {
 # prints the cache and exists if requested
 if ($print_cache) {
 	my $cache=read_file('/var/cache/suricata-monitoring/stats.json');
+	print $cache;
 	exit;
 }
 
