@@ -322,27 +322,46 @@ sub run {
 						dec_tcp          => $json->{stats}{decoder}{tcp},
 						dec_avg_pkt_size => $json->{stats}{decoder}{avg_pkt_size},
 						dec_max_pkt_size => $json->{stats}{decoder}{max_pkt_size},
-						f_tcp            => $json->{stats}{flow}{tcp},
-						f_udp            => $json->{stats}{flow}{udp},
-						f_icmpv4         => $json->{stats}{flow}{icmpv4},
-						f_icmpv6         => $json->{stats}{flow}{icmpv6},
-						f_memuse         => $json->{stats}{flow}{memuse},
-						ftp_memuse       => $json->{stats}{ftp}{memuse},
-						http_memuse      => $json->{stats}{http}{memuse},
-						tcp_memuse       => $json->{stats}{tcp}{memuse},
-						tcp_reass_memuse => $json->{stats}{tcp}{reassembly_memuse},
-						alert            => 0,
-						alertString      => '',
+						dec_chdlc          => $json->{stats}{decoder}{chdlc},
+						dec_ethernet       => $json->{stats}{decoder}{ethernet},
+						dec_geneve         => $json->{stats}{decoder}{geneve},
+						dec_ieee8021ah     => $json->{stats}{decoder}{ieee8021ah},
+						dec_ipv4_in_ipv6   => $json->{stats}{decoder}{ipv6_in_ipv6},
+						dec_mx_mac_addrs_d => $json->{stats}{decoder}{max_mac_addrs_dst},
+						dec_mx_mac_addrs_s => $json->{stats}{decoder}{max_mac_addrs_src},
+						dec_mpls           => $json->{stats}{decoder}{mpls},
+						dec_ppp            => $json->{stats}{decoder}{ppp},
+						dec_pppoe          => $json->{stats}{decoder}{pppoe},
+						dec_raw            => $json->{stats}{decoder}{raw},
+						dec_sctp           => $json->{stats}{decoder}{sctp},
+						dec_sll            => $json->{stats}{decoder}{ssl},
+						dec_teredo         => $json->{stats}{decoder}{teredo},
+						dec_too_many_layer => $json->{stats}{decoder}{too_many_layers},
+						dec_vlan           => $json->{stats}{decoder}{vlan},
+						dec_vlan_qinq      => $json->{stats}{decoder}{vlan_qinq},
+						dec_wntag          => $json->{stats}{decoder}{wntag},
+						dec_wxlan          => $json->{stats}{decoder}{wxlan},
+						f_tcp              => $json->{stats}{flow}{tcp},
+						f_udp              => $json->{stats}{flow}{udp},
+						f_icmpv4           => $json->{stats}{flow}{icmpv4},
+						f_icmpv6           => $json->{stats}{flow}{icmpv6},
+						f_memuse           => $json->{stats}{flow}{memuse},
+						ftp_memuse         => $json->{stats}{ftp}{memuse},
+						http_memuse        => $json->{stats}{http}{memuse},
+						tcp_memuse         => $json->{stats}{tcp}{memuse},
+						tcp_reass_memuse   => $json->{stats}{tcp}{reassembly_memuse},
+						alert              => 0,
+						alertString        => '',
 					};
 
 					foreach my $flow_key ( keys( %{ $json->{stats}{app_layer}{flow} } ) ) {
-						my $new_key=$flow_key;
-						$new_key=~s/\-/_/g;
+						my $new_key = $flow_key;
+						$new_key =~ s/\-/_/g;
 						$new_stats->{ 'af_' . $new_key } = $json->{stats}{app_layer}{flow}{$flow_key};
 					}
 					foreach my $tx_key ( keys( %{ $json->{stats}{app_layer}{tx} } ) ) {
-						my $new_key=$tx_key;
-						$new_key=~s/\-/_/g;
+						my $new_key = $tx_key;
+						$new_key =~ s/\-/_/g;
 						$new_stats->{ 'at_' . $new_key } = $json->{stats}{app_layer}{tx}{$tx_key};
 					}
 
