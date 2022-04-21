@@ -335,8 +335,8 @@ sub run {
 						alertString      => '',
 					};
 
-					foreach my $flow_key ( keys( %{ $json->{stats}{app_layer}{flows} } ) ) {
-						$new_stats->{ 'af_' . $flow_key } = $json->{stats}{app_layer}{flows}{$flow_key};
+					foreach my $flow_key ( keys( %{ $json->{stats}{app_layer}{flow} } ) ) {
+						$new_stats->{ 'af_' . $flow_key } = $json->{stats}{app_layer}{flow}{$flow_key};
 					}
 					foreach my $tx_key ( keys( %{ $json->{stats}{app_layer}{tx} } ) ) {
 						$new_stats->{ 'at_' . $tx_key } = $json->{stats}{app_layer}{tx}{$tx_key};
