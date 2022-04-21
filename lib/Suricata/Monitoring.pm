@@ -115,7 +115,6 @@ sub new {
 		'error_percent_crit' => '0.1',
 		max_age              => 360,
 		mode                 => 'librenms',
-		run_time             => '30',
 	};
 	bless $self;
 
@@ -224,8 +223,10 @@ sub run {
 	my @instances = keys( %{ $self->{files} } );
 	my @alerts;
 	my $current_till;
-	my $run_till=time + $self->{run_time};
 	foreach my $instance (@instances) {
+
+		# ends processing for this file
+		my $process_it = 1;
 
 		# open the file for reading it backwards
 		my $bw;
@@ -239,11 +240,14 @@ sub run {
 				$to_return->{errorString} = $to_return->{errorString} . "\n";
 			}
 			$to_return->{errorString} = $to_return->{errorString} . $instance . ': ' . $@;
+			$process_it = 0;
 		}
 
-		#
-		my $process_it = 1;
-		my $line       = $bw->readline;
+		# get the first line, if possible
+		my $line;
+		if ($process_it) {
+			$line = $bw->readline;
+		}
 		while ( $process_it
 			&& defined($line) )
 		{
@@ -283,10 +287,6 @@ sub run {
 				# stop process further lines as we've hit the oldest we care about
 				if ( $t->epoch <= $current_till ) {
 					$process_it = 0;
-				}
-
-				if (time >= $run_till) {
-					$process_it=1;
 				}
 
 				# we found the entry we are looking for if
@@ -519,6 +519,9 @@ sub run {
 				}
 
 			};
+
+			# get the next line
+			$line = $bw->readline;
 		}
 
 	}
