@@ -3,6 +3,8 @@ Revision history for Suricata-Monitoring
 0.1.0	 20222-04-21/
 		 -Add .total support.
 		 -More documentation.
+		 -Actually fetch the next line, instead of running away if the stat was not the last entry.
+		 -Properly read in app layer flow counters.
 
 0.0.1	 2022-04-20/15:00
 		 -Initial release.
