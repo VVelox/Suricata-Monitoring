@@ -115,6 +115,7 @@ sub new {
 		'error_percent_crit' => '0.1',
 		max_age              => 360,
 		mode                 => 'librenms',
+		run_time             => '30',
 	};
 	bless $self;
 
@@ -223,6 +224,7 @@ sub run {
 	my @instances = keys( %{ $self->{files} } );
 	my @alerts;
 	my $current_till;
+	my $run_till=time + $self->{run_time};
 	foreach my $instance (@instances) {
 
 		# open the file for reading it backwards
@@ -242,8 +244,6 @@ sub run {
 		#
 		my $process_it = 1;
 		my $line       = $bw->readline;
-		my $found;
-
 		while ( $process_it
 			&& defined($line) )
 		{
@@ -252,10 +252,10 @@ sub run {
 				my $timestamp = $json->{timestamp};
 
 				# if current till is not set, set it
-				if ( !defined($current_till) &&
-					 defined($timestamp) &&
-					 $timestamp =~ /^[0-9]+\-[0-9]+\-[0-9]+T[0-9]+\:[0-9]+\:[0-9\.]+[\-\+][0-9]+/
-					) {
+				if (  !defined($current_till)
+					&& defined($timestamp)
+					&& $timestamp =~ /^[0-9]+\-[0-9]+\-[0-9]+T[0-9]+\:[0-9]+\:[0-9\.]+[\-\+][0-9]+/ )
+				{
 
 					# get the number of hours
 					my $hours = $timestamp;
@@ -283,6 +283,10 @@ sub run {
 				# stop process further lines as we've hit the oldest we care about
 				if ( $t->epoch <= $current_till ) {
 					$process_it = 0;
+				}
+
+				if (time >= $run_till) {
+					$process_it=1;
 				}
 
 				# we found the entry we are looking for if
@@ -328,7 +332,7 @@ sub run {
 						tcp_memuse       => $json->{stats}{tcp}{memuse},
 						tcp_reass_memuse => $json->{stats}{tcp}{reassembly_memuse},
 						alert            => 0,
-						alertString     => '',
+						alertString      => '',
 					};
 
 					foreach my $flow_key ( keys( %{ $json->{stats}{app_layer}{flows} } ) ) {
@@ -526,13 +530,16 @@ sub run {
 
 	# compute percents for .total
 	if ( $to_return->{data}{'.total'}{packet_delta} != 0 ) {
-		$to_return->{data}{'.total'}{drop_percent} = ( $to_return->{data}{'.total'}{drop_delta} / $to_return->{data}{'.total'}{packet_delta} ) * 100;
+		$to_return->{data}{'.total'}{drop_percent}
+			= ( $to_return->{data}{'.total'}{drop_delta} / $to_return->{data}{'.total'}{packet_delta} ) * 100;
 		$to_return->{data}{'.total'}{drop_percent} = sprintf( '%0.5f', $to_return->{data}{'.total'}{ifdrop_percent} );
 
-		$to_return->{data}{'.total'}{ifdrop_percent} = ( $to_return->{data}{'.total'}{ifdrop_delta} / $to_return->{data}{'.total'}{packet_delta} ) * 100;
+		$to_return->{data}{'.total'}{ifdrop_percent}
+			= ( $to_return->{data}{'.total'}{ifdrop_delta} / $to_return->{data}{'.total'}{packet_delta} ) * 100;
 		$to_return->{data}{'.total'}{ifdrop_percent} = sprintf( '%0.5f', $to_return->{data}{'.total'}{ifdrop_percent} );
 
-		$to_return->{data}{'.total'}{error_percent} = ( $to_return->{data}{'.total'}{error_delta} / $to_return->{data}{'.total'}{packet_delta} ) * 100;
+		$to_return->{data}{'.total'}{error_percent}
+			= ( $to_return->{data}{'.total'}{error_delta} / $to_return->{data}{'.total'}{packet_delta} ) * 100;
 		$to_return->{data}{'.total'}{error_percent} = sprintf( '%0.5f', $to_return->{data}{'.total'}{error_percent} );
 	}
 
