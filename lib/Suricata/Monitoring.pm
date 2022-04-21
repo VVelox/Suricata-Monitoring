@@ -252,17 +252,20 @@ sub run {
 				my $timestamp = $json->{timestamp};
 
 				# if current till is not set, set it
-				if ( !defined($current_till) ) {
+				if ( !defined($current_till) &&
+					 defined($timestamp) &&
+					 $timestamp =~ /^[0-9]+\-[0-9]+\-[0-9]+T[0-9]+\:[0-9]+\:[0-9\.]+[\-\+][0-9]+/
+					) {
 
 					# get the number of hours
 					my $hours = $timestamp;
-					$hours =~ s/.*[-+]//g;
+					$hours =~ s/.*[\-\+]//g;
 					$hours =~ s/^0//;
 					$hours =~ s/[0-9][0-9]$//;
 
 					# get the number of minutes
 					my $minutes = $timestamp;
-					$minutes =~ s/.*[-+]//g;
+					$minutes =~ s/.*[\-\+]//g;
 					$minutes =~ s/^[0-9][0-9]//;
 
 					my $second_diff = ( $minutes * 60 ) + ( $hours * 60 * 60 );
@@ -278,7 +281,7 @@ sub run {
 				my $t = Time::Piece->strptime( $timestamp, '%Y-%m-%dT%H:%M:%S' );
 
 				# stop process further lines as we've hit the oldest we care about
-				if ( $t->epoch < $current_till ) {
+				if ( $t->epoch <= $current_till ) {
 					$process_it = 0;
 				}
 
@@ -594,6 +597,10 @@ sub print_output {
 		print encode_json( $self->{results} ) . "\n";
 	}
 }
+
+=head1 LibreNMS HASH
+
+
 
 =head1 AUTHOR
 
