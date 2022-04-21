@@ -190,7 +190,7 @@ sub run {
 
 	# this will be returned
 	my $to_return = {
-		data        => { '.totals' => {} },
+		data        => { '.total' => {} },
 		version     => 1,
 		error       => '0',
 		errorString => '',
