@@ -336,10 +336,14 @@ sub run {
 					};
 
 					foreach my $flow_key ( keys( %{ $json->{stats}{app_layer}{flow} } ) ) {
-						$new_stats->{ 'af_' . $flow_key } = $json->{stats}{app_layer}{flow}{$flow_key};
+						my $new_key=$flow_key;
+						$new_key=~s/\-/_/g;
+						$new_stats->{ 'af_' . $new_key } = $json->{stats}{app_layer}{flow}{$flow_key};
 					}
 					foreach my $tx_key ( keys( %{ $json->{stats}{app_layer}{tx} } ) ) {
-						$new_stats->{ 'at_' . $tx_key } = $json->{stats}{app_layer}{tx}{$tx_key};
+						my $new_key=$tx_key;
+						$new_key=~s/\-/_/g;
+						$new_stats->{ 'at_' . $new_key } = $json->{stats}{app_layer}{tx}{$tx_key};
 					}
 
 					# some this is a bit variable as to which will be present based on the system
