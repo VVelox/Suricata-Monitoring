@@ -325,7 +325,7 @@ sub run {
 						tcp_memuse       => $json->{stats}{tcp}{memuse},
 						tcp_reass_memuse => $json->{stats}{tcp}{reassembly_memuse},
 						alert            => 0,
-						alert_string     => '',
+						alertString     => '',
 					};
 
 					foreach my $flow_key ( keys( %{ $json->{stats}{app_layer}{flows} } ) ) {
@@ -519,7 +519,7 @@ sub run {
 	$to_return->{data}{'.total'}{alert} = $to_return->{'alert'};
 
 	# join any found alerts into the string
-	$to_return->{alertsString} = join( "\n", @alerts );
+	$to_return->{alertString} = join( "\n", @alerts );
 
 	# compute percents for .total
 	if ( $to_return->{data}{'.total'}{packet_delta} != 0 ) {
