@@ -529,7 +529,7 @@ sub run {
 		$to_return->{data}{'.total'}{ifdrop_percent} = ( $to_return->{data}{'.total'}{ifdrop_delta} / $to_return->{data}{'.total'}{packet_delta} ) * 100;
 		$to_return->{data}{'.total'}{ifdrop_percent} = sprintf( '%0.5f', $to_return->{data}{'.total'}{ifdrop_percent} );
 
-		$to_return->{data}{'.total'}{error_percent} = ( $to_return->{data}{'.total'}{error_delta} / $to_return->{data}{'.total'}{alert}{packet_delta} ) * 100;
+		$to_return->{data}{'.total'}{error_percent} = ( $to_return->{data}{'.total'}{error_delta} / $to_return->{data}{'.total'}{packet_delta} ) * 100;
 		$to_return->{data}{'.total'}{error_percent} = sprintf( '%0.5f', $to_return->{data}{'.total'}{error_percent} );
 	}
 
