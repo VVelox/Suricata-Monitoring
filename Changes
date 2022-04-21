@@ -1,4 +1,8 @@
 Revision history for Suricata-Monitoring
 
-0.0.0   2022-04-20/15:00
-        -Initial release.
+0.1.0	 20222-04-21/
+		 -Add .total support.
+		 -More documentation.
+
+0.0.1	 2022-04-20/15:00
+		 -Initial release.

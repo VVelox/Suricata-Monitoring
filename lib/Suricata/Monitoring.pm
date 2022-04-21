@@ -16,11 +16,11 @@ Suricata::Monitoring - LibreNMS JSON SNMP extend and Nagios style check for Suri
 
 =head1 VERSION
 
-Version 0.0.1
+Version 0.1.0
 
 =cut
 
-our $VERSION = '0.0.1';
+our $VERSION = '0.1.0';
 
 =head1 SYNOPSIS
 
@@ -78,7 +78,8 @@ The only must have is 'files'.
       - Default :: .1
     
     - files :: A hash with the keys being the instance name and the values
-      being the Eve files to read.
+      being the Eve files to read. ".total" is not a valid instance name.
+      Similarly anything starting with a "." should be considred reserved.
 
     my $args = {
         mode               => 'librenms',
@@ -154,6 +155,10 @@ sub new {
 		$self->{files} = $args{files};
 	}
 
+	if ( defined( $self->{files}{'.total'} ) ) {
+		confess('".total" is not a valid instance name');
+	}
+
 	# pull in cache dir location
 	if ( !defined( $args{cache_dir} ) ) {
 		$args{cache_dir} = '/var/cache/suricata-monitoring/';
@@ -184,7 +189,14 @@ sub run {
 	my $self = $_[0];
 
 	# this will be returned
-	my $to_return = { data => {}, version => 1, error => '0', errorString => '', alert => '0', alertString => '' };
+	my $to_return = {
+		data        => { '.totals' => {} },
+		version     => 1,
+		error       => '0',
+		errorString => '',
+		alert       => '0',
+		alertString => ''
+	};
 
 	my $previous;
 	my $previous_file = $self->{cache_dir} . '/stats.json';
@@ -482,6 +494,20 @@ sub run {
 						}
 					}
 
+					# add stuff to .total
+					my @intance_keys = keys( %{$new_stats} );
+					foreach my $total_key (@intance_keys) {
+						if ( $total_key ne 'alertString' ) {
+							if ( !defined( $to_return->{data}{'.total'}{$total_key} ) ) {
+								$to_return->{data}{'.total'}{$total_key} = $new_stats->{$total_key};
+							}
+							else {
+								$to_return->{data}{'.total'}{$total_key}
+									= $to_return->{data}{'.total'}{$total_key} + $new_stats->{$total_key};
+							}
+						}
+					}
+
 					$to_return->{data}{$instance} = $new_stats;
 				}
 
@@ -490,14 +516,28 @@ sub run {
 
 	}
 
+	$to_return->{data}{'.total'}{alert} = $to_return->{'alert'};
+
 	# join any found alerts into the string
 	$to_return->{alertsString} = join( "\n", @alerts );
+
+	# compute percents for .total
+	if ( $to_return->{data}{'.total'}{alert}{packet_delta} != 0 ) {
+		$to_return->{data}{'.total'}{alert}{drop_percent} = ( $to_return->{data}{'.total'}{alert}{drop_delta} / $to_return->{data}{'.total'}{alert}{packet_delta} ) * 100;
+		$to_return->{data}{'.total'}{alert}{drop_percent} = sprintf( '%0.5f', $to_return->{data}{'.total'}{alert}{ifdrop_percent} );
+
+		$to_return->{data}{'.total'}{alert}{ifdrop_percent} = ( $to_return->{data}{'.total'}{alert}{ifdrop_delta} / $to_return->{data}{'.total'}{alert}{packet_delta} ) * 100;
+		$to_return->{data}{'.total'}{alert}{ifdrop_percent} = sprintf( '%0.5f', $to_return->{data}{'.total'}{alert}{ifdrop_percent} );
+
+		$to_return->{data}{'.total'}{alert}{error_percent} = ( $to_return->{data}{'.total'}{alert}{error_delta} / $to_return->{data}{'.total'}{alert}{packet_delta} ) * 100;
+		$to_return->{data}{'.total'}{alert}{error_percent} = sprintf( '%0.5f', $to_return->{data}{'.total'}{alert}{error_percent} );
+	}
 
 	# write the cache file on out
 	eval {
 		my $new_cache = encode_json($to_return);
 		open( my $fh, '>', $previous_file );
-		print $fh $new_cache."\n";
+		print $fh $new_cache . "\n";
 		close($fh);
 	};
 	if ($@) {
