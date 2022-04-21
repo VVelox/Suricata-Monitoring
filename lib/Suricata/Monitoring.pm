@@ -522,15 +522,15 @@ sub run {
 	$to_return->{alertsString} = join( "\n", @alerts );
 
 	# compute percents for .total
-	if ( $to_return->{data}{'.total'}{alert}{packet_delta} != 0 ) {
-		$to_return->{data}{'.total'}{alert}{drop_percent} = ( $to_return->{data}{'.total'}{alert}{drop_delta} / $to_return->{data}{'.total'}{alert}{packet_delta} ) * 100;
-		$to_return->{data}{'.total'}{alert}{drop_percent} = sprintf( '%0.5f', $to_return->{data}{'.total'}{alert}{ifdrop_percent} );
+	if ( $to_return->{data}{'.total'}{packet_delta} != 0 ) {
+		$to_return->{data}{'.total'}{drop_percent} = ( $to_return->{data}{'.total'}{drop_delta} / $to_return->{data}{'.total'}{packet_delta} ) * 100;
+		$to_return->{data}{'.total'}{drop_percent} = sprintf( '%0.5f', $to_return->{data}{'.total'}{ifdrop_percent} );
 
-		$to_return->{data}{'.total'}{alert}{ifdrop_percent} = ( $to_return->{data}{'.total'}{alert}{ifdrop_delta} / $to_return->{data}{'.total'}{alert}{packet_delta} ) * 100;
-		$to_return->{data}{'.total'}{alert}{ifdrop_percent} = sprintf( '%0.5f', $to_return->{data}{'.total'}{alert}{ifdrop_percent} );
+		$to_return->{data}{'.total'}{ifdrop_percent} = ( $to_return->{data}{'.total'}{ifdrop_delta} / $to_return->{data}{'.total'}{packet_delta} ) * 100;
+		$to_return->{data}{'.total'}{ifdrop_percent} = sprintf( '%0.5f', $to_return->{data}{'.total'}{ifdrop_percent} );
 
-		$to_return->{data}{'.total'}{alert}{error_percent} = ( $to_return->{data}{'.total'}{alert}{error_delta} / $to_return->{data}{'.total'}{alert}{packet_delta} ) * 100;
-		$to_return->{data}{'.total'}{alert}{error_percent} = sprintf( '%0.5f', $to_return->{data}{'.total'}{alert}{error_percent} );
+		$to_return->{data}{'.total'}{error_percent} = ( $to_return->{data}{'.total'}{error_delta} / $to_return->{data}{'.total'}{alert}{packet_delta} ) * 100;
+		$to_return->{data}{'.total'}{error_percent} = sprintf( '%0.5f', $to_return->{data}{'.total'}{error_percent} );
 	}
 
 	# write the cache file on out
