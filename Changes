@@ -1,6 +1,6 @@
 Revision history for Suricata-Monitoring
 
-0.1.0	 20222-04-21/
+0.1.0	 20222-04-22/11:30
 		 -Add .total support.
 		 -More documentation.
 		 -Actually fetch the next line, instead of running away if the stat was not the last entry.
