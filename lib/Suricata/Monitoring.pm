@@ -633,7 +633,77 @@ sub print_output {
 
 =head1 LibreNMS HASH
 
+    + $hash{'alert'} :: Alert status.
+      - 0 :: OK
+      - 1 :: WARNING
+      - 2 :: CRITICAL
+      - 3 :: UNKNOWN
+    
+    + $hash{'alertString'} :: A string describing the alert. Defaults to
+      '' if there is no alert.
+    
+    + $hash{'error'} :: A integer representing a error. '0' represents
+      everything is fine.
+    
+    + $hash{'errorString'} :: A string description of the error.
+    
+    + $hash{'data'}{$instance} :: Values migrated from the
+      instance. *_delta values are created via computing the difference
+      from the previously saved info. *_percent is based off of the delta
+      in question over the packet delta. Delta are created for packet,
+      drop, ifdrop, and error. Percents are made for drop, ifdrop, and
+      error.
+    
+    + $hash{'data'}{'.total'} :: Total values of from all the
+      intances. Any percents will be recomputed.
+    
 
+    The stat keys are migrated as below.
+    
+    uptime           => $json->{stats}{uptime},
+    packets          => $json->{stats}{capture}{kernel_packets},
+    dropped          => $json->{stats}{capture}{kernel_drops},
+    ifdropped        => $json->{stats}{capture}{kernel_ifdrops},
+    errors           => $json->{stats}{capture}{errors},
+    bytes            => $json->{stats}{decoder}{bytes},
+    dec_packets      => $json->{stats}{decoder}{pkts},
+    dec_invalid      => $json->{stats}{decoder}{invalid},
+    dec_ipv4         => $json->{stats}{decoder}{ipv4},
+    dec_ipv6         => $json->{stats}{decoder}{ipv6},
+    dec_udp          => $json->{stats}{decoder}{udp},
+    dec_tcp          => $json->{stats}{decoder}{tcp},
+    dec_avg_pkt_size => $json->{stats}{decoder}{avg_pkt_size},
+    dec_max_pkt_size => $json->{stats}{decoder}{max_pkt_size},
+    dec_chdlc          => $json->{stats}{decoder}{chdlc},
+    dec_ethernet       => $json->{stats}{decoder}{ethernet},
+    dec_geneve         => $json->{stats}{decoder}{geneve},
+    dec_ieee8021ah     => $json->{stats}{decoder}{ieee8021ah},
+    dec_ipv4_in_ipv6   => $json->{stats}{decoder}{ipv6_in_ipv6},
+    dec_mx_mac_addrs_d => $json->{stats}{decoder}{max_mac_addrs_dst},
+    dec_mx_mac_addrs_s => $json->{stats}{decoder}{max_mac_addrs_src},
+    dec_mpls           => $json->{stats}{decoder}{mpls},
+    dec_ppp            => $json->{stats}{decoder}{ppp},
+    dec_pppoe          => $json->{stats}{decoder}{pppoe},
+    dec_raw            => $json->{stats}{decoder}{raw},
+    dec_sctp           => $json->{stats}{decoder}{sctp},
+    dec_sll            => $json->{stats}{decoder}{sll},
+    dec_teredo         => $json->{stats}{decoder}{teredo},
+    dec_too_many_layer => $json->{stats}{decoder}{too_many_layers},
+    dec_vlan           => $json->{stats}{decoder}{vlan},
+    dec_vlan_qinq      => $json->{stats}{decoder}{vlan_qinq},
+    dec_vntag          => $json->{stats}{decoder}{vntag},
+    dec_vxlan          => $json->{stats}{decoder}{vxlan},
+    f_tcp              => $json->{stats}{flow}{tcp},
+    f_udp              => $json->{stats}{flow}{udp},
+    f_icmpv4           => $json->{stats}{flow}{icmpv4},
+    f_icmpv6           => $json->{stats}{flow}{icmpv6},
+    f_memuse           => $json->{stats}{flow}{memuse},
+    ftp_memuse         => $json->{stats}{ftp}{memuse},
+    http_memuse        => $json->{stats}{http}{memuse},
+    tcp_memuse         => $json->{stats}{tcp}{memuse},
+    tcp_reass_memuse   => $json->{stats}{tcp}{reassembly_memuse},
+    af_*               => $json->{stats}{app_layer}{flow}{*}
+    at_*               => $json->{stats}{app_layer}{tx}{*}
 
 =head1 AUTHOR
 
