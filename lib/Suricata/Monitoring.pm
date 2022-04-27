@@ -550,7 +550,7 @@ sub run {
 	}
 
 	# compute percents for .total
-	if ( defined( $to_return->{data}{'.total'}{packet_delta} ) && $to_return->{data}{'.total'}{packet_delta} != 0 ) {
+	if ( ! defined( $to_return->{data}{'.total'}{packet_delta} ) && $to_return->{data}{'.total'}{packet_delta} != 0 ) {
 		$to_return->{data}{'.total'}{drop_percent}
 			= ( $to_return->{data}{'.total'}{drop_delta} / $to_return->{data}{'.total'}{packet_delta} ) * 100;
 		$to_return->{data}{'.total'}{drop_percent} = sprintf( '%0.5f', $to_return->{data}{'.total'}{ifdrop_percent} );
