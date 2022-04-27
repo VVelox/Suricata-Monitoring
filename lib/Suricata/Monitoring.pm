@@ -550,7 +550,7 @@ sub run {
 	}
 
 	# compute percents for .total
-	if (   ( !defined( $to_return->{data}{'.total'}{packet_delta} ) )
+	if ( defined( $to_return->{data}{'.total'}{packet_delta} )
 		&& ( $to_return->{data}{'.total'}{packet_delta} != 0 ) )
 	{
 		$to_return->{data}{'.total'}{drop_percent}
