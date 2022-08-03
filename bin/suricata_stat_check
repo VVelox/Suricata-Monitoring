@@ -20,7 +20,7 @@ suricata_stats_check B<-m> manual B<-1> <manual>  [B<-d> <drop percent warn>]
 [B<-4> <manual>] [B<-5> <manual>] [B<-6> <manual>] [B<-7> <manual>]
 [B<-8> <manual>] [B<-9> <manual>] [B<-0> <manual>]
 
-suricata_stats_check -c
+suricata_stats_check B<-c> [B<-b>]
 
 =head1 DESCRIPTION
 
@@ -34,7 +34,7 @@ cron...
 
 snmp.conf...
 
-extend suricata-stats /usr/local/bin/suricata_stat_check -c
+extend suricata-stats /usr/local/bin/suricata_stat_check -c -b
 
 =head1 FLAGS
 
@@ -196,9 +196,11 @@ use warnings;
 use Getopt::Long;
 use File::Slurp;
 use Suricata::Monitoring;
+use MIME::Base64;
+use Gzip::Faster;
 
 sub version {
-	print "suricata_stat_check v. 0.0.1\n";
+	print "suricata_stat_check v. 0.1.0\n";
 }
 
 sub help {
@@ -315,6 +317,7 @@ my $error_delta_crit   = '2';
 my $error_percent_warn = '.05';
 my $error_percent_crit = '.1';
 my $print_cache;
+my $compress;
 Getopt::Long::Configure('no_ignore_case');
 Getopt::Long::Configure('bundling');
 GetOptions(
@@ -345,6 +348,7 @@ GetOptions(
 	'r=s'     => \$error_percent_warn,
 	'R=s'     => \$error_percent_crit,
 	'c'       => \$print_cache,
+	'b'       => \$compress,
 );
 
 # print version or help if requested
@@ -359,7 +363,15 @@ if ($version) {
 
 # prints the cache and exists if requested
 if ($print_cache) {
-	my $cache=read_file('/var/cache/suricata-monitoring/stats.json');
+	my $cache = read_file('/var/cache/suricata-monitoring/stats.json');
+
+	my $compressed = encode_base64( gzip($cache) );
+	$compressed =~ s/\n//g;
+	$compressed = $compressed . "\n";
+	if ( length($compressed) < length($cache) ) {
+        print $compressed;
+	}
+
 	print $cache;
 	exit;
 }
