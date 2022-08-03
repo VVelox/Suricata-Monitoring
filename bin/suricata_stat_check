@@ -370,6 +370,7 @@ if ($print_cache) {
 	$compressed = $compressed . "\n";
 	if ( length($compressed) < length($cache) ) {
         print $compressed;
+		exit;
 	}
 
 	print $cache;
