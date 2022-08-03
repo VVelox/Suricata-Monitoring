@@ -38,6 +38,14 @@ extend suricata-stats /usr/local/bin/suricata_stat_check -c -b
 
 =head1 FLAGS
 
+=head2 -c
+
+Print the saved cached and exit.
+
+=head2 -b
+
+When used with -c, gzip the output and convert to base64.
+
 =head2 -m <mode>
 
 Mode to run in.
