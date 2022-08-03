@@ -365,12 +365,14 @@ if ($version) {
 if ($print_cache) {
 	my $cache = read_file('/var/cache/suricata-monitoring/stats.json');
 
-	my $compressed = encode_base64( gzip($cache) );
-	$compressed =~ s/\n//g;
-	$compressed = $compressed . "\n";
-	if ( length($compressed) < length($cache) ) {
-        print $compressed;
-		exit;
+	if ($compress) {
+		my $compressed = encode_base64( gzip($cache) );
+		$compressed =~ s/\n//g;
+		$compressed = $compressed . "\n";
+		if ( length($compressed) < length($cache) ) {
+			print $compressed;
+			exit;
+		}
 	}
 
 	print $cache;
