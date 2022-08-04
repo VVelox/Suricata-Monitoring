@@ -16,11 +16,11 @@ Suricata::Monitoring - LibreNMS JSON SNMP extend and Nagios style check for Suri
 
 =head1 VERSION
 
-Version 0.3.0
+Version 0.3.1
 
 =cut
 
-our $VERSION = '0.3.0';
+our $VERSION = '0.3.1';
 
 =head1 SYNOPSIS
 
@@ -570,7 +570,7 @@ sub run {
 		$to_return->{data}{'.total'}{error_percent} = sprintf( '%0.5f', $to_return->{data}{'.total'}{error_percent} );
 	}
 	else {
-		$to_return->{data}{alert} = '3';
+		$to_return->{alert} = '3';
 		push( @alerts, 'Did not find a stats entry after searching back ' . $self->{max_age} . ' seconds' );
 	}
 
