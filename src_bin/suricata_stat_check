@@ -1,8 +1,23 @@
 #!perl
 
+use strict;
+use warnings;
+use Getopt::Long;
+use File::Slurp;
+use Suricata::Monitoring;
+use MIME::Base64;
+use Hash::Flatten      qw(:all) use Pod::Usage;
+use IO::Compress::Gzip qw(gzip $GzipError);
+
 =head1 NAME
 
 suricata_stat_check - LibreNMS JSON SNMP extend and Nagios style check for Suricata stats.
+
+=cut
+
+sub version {
+	print "suricata_stat_check v. 0.1.0\n";
+}
 
 =head1 SYNOPSIS
 
@@ -203,91 +218,8 @@ name of "inet" with a eve file of "/var/log/suricata/inet.json".
 
 =cut
 
-use strict;
-use warnings;
-use Getopt::Long;
-use File::Slurp;
-use Suricata::Monitoring;
-use MIME::Base64;
-use Gzip::Faster;
-
-sub version {
-	print "suricata_stat_check v. 0.1.0\n";
-}
-
 sub help {
-	&version;
-
-	print '
-
--m <mode>                Mode to run in.
-                         Default: single
-
--s <eve>                 Eve file for use with single mode.
-                         Default: /var/log/suricata/eve.json
--S <instance name>       Instance name to use in single mode.
-                         Default: ids
-
--s <slug>                The slug to use in slug mode.
-                         Default: alert
--l <log dir>             Log directory for slug mode.
-                         Default: /var/log/suricata
-
--0 <manual>              A file to use in manual mode.
--1 <manual>              A file to use in manual mode.
--2 <manual>              A file to use in manual mode.
--3 <manual>              A file to use in manual mode.
--4 <manual>              A file to use in manual mode.
--5 <manual>              A file to use in manual mode.
--6 <manual>              A file to use in manual mode.
--7 <manual>              A file to use in manual mode.
--8 <manual>              A file to use in manual mode.
--9 <manual>              A file to use in manual mode.
--0 <manual>              A file to use in manual mode.
-
--c                       Print the cache and exit.
-
--d <drop percent warn>   Percent of drop packets to warn on.
-                         Default: 0.75%
--D <drop percent crit>   Percent of dropped packets to critical on.
-                         Default: 1%
--e <error delta warn>    Error delta to warn on.
-                         Default: 1
--E <error delta crit>    Error delta to critical on.
-                         Default: 2
--r <error percent warn>  Percent of drop packets to warn on.
-                         Default: 0.05%
--R <error percent crit>  Percent of drop packets to warn on.
-                         Default: 0.1%
-
--a <seconds>             How far back to read.
-                         Default: 360
-
--n                       Run as a nagios check style instead of LibreNMS.
-
--h                       Print help info.
---help                   Print help info.
--v                       Print version info.
---version                Print version info.
-
-
-* Modes
-
-- single :: Use the specified eve file, -e, and the specified instance
-  name, -i.
-
-- slug :: Check the dir specified, -l. for files starting with the
-  slug, -s. The files must match
-  //^$slug\-[A-Za-z\_\-]\.[Jj][Ss][Oo][Nn]$//. The instance name is formed
-  by removing //^$slug\-/// and //\.[Jj][Ss][Oo][Nn]$//. So
-  "alert-ids.json" becomes "ids".
-
-- manual :: Use the files specified via -0 to -9 to specify instance
-  names and files. The value taken by each of those is comma seperated
-  with the first part being the instance name and the second being the
-  eve file. So "inet,/var/log/suricata/inet.json" would be a instance
-  name of "inet" with a eve file of "/var/log/suricata/inet.json".
-';
+	pod2usage( -exitval => 255, -verbose => 2, -output => \*STDOUT, );
 }
 
 sub instance_name_check {
@@ -295,16 +227,14 @@ sub instance_name_check {
 
 	if ( !defined($name) ) {
 		return undef;
-	}
-	elsif ( $name eq '' ) {
+	} elsif ( $name eq '' ) {
 		return undef;
-	}
-	elsif ( $name =~ /[\t\n\ \;\/\\\:\"\']/ ) {
+	} elsif ( $name =~ /[\t\n\ \;\/\\\:\"\']/ ) {
 		return undef;
 	}
 
 	return 1;
-}
+} ## end sub instance_name_check
 
 # get the commandline options
 my $help        = 0;
@@ -383,18 +313,19 @@ if ($print_cache) {
 	my $cache = read_file('/var/cache/suricata-monitoring/stats.json');
 
 	if ($compress) {
-		my $compressed = encode_base64( gzip($cache) );
+		my $compressed_string;
+		gzip \$cache => \$compressed_string;
+		my $compressed = encode_base64($compressed_string);
 		$compressed =~ s/\n//g;
 		$compressed = $compressed . "\n";
 		if ( length($compressed) < length($cache) ) {
-			print $compressed;
-			exit;
+			$cache = $compressed;
 		}
-	}
+	} ## end if ($compress)
 
 	print $cache;
 	exit;
-}
+} ## end if ($print_cache)
 
 my $instances = {};
 
@@ -409,8 +340,7 @@ if ( $mode eq 'single' ) {
 	}
 
 	$instances->{$single_name} = $single_eve;
-}
-elsif ( $mode eq 'slug' ) {
+} elsif ( $mode eq 'slug' ) {
 	my $dh;
 	my $found = 0;
 	opendir( $dh, $log_dir ) or die( 'Ubable to open dir "' . $log_dir . '"' );
@@ -423,8 +353,7 @@ elsif ( $mode eq 'slug' ) {
 		}
 	}
 	close($dh);
-}
-elsif ( $mode eq 'manual' ) {
+} elsif ( $mode eq 'manual' ) {
 
 	# grab instance from -0
 	if ( defined($instance_0) ) {
@@ -439,7 +368,7 @@ elsif ( $mode eq 'manual' ) {
 			die( '"' . $instance . '" is not a valid instance name' );
 		}
 		$instances->{$instance} = $eve;
-	}
+	} ## end if ( defined($instance_0) )
 
 	# grab instance from -1
 	if ( defined($instance_1) ) {
@@ -454,7 +383,7 @@ elsif ( $mode eq 'manual' ) {
 			die( '"' . $instance . '" is not a valid instance name' );
 		}
 		$instances->{$instance} = $eve;
-	}
+	} ## end if ( defined($instance_1) )
 
 	# grab instance from -2
 	if ( defined($instance_2) ) {
@@ -469,7 +398,7 @@ elsif ( $mode eq 'manual' ) {
 			die( '"' . $instance . '" is not a valid instance name' );
 		}
 		$instances->{$instance} = $eve;
-	}
+	} ## end if ( defined($instance_2) )
 
 	# grab instance from -3
 	if ( defined($instance_3) ) {
@@ -484,7 +413,7 @@ elsif ( $mode eq 'manual' ) {
 			die( '"' . $instance . '" is not a valid instance name' );
 		}
 		$instances->{$instance} = $eve;
-	}
+	} ## end if ( defined($instance_3) )
 
 	# grab instance from -4
 	if ( defined($instance_4) ) {
@@ -499,7 +428,7 @@ elsif ( $mode eq 'manual' ) {
 			die( '"' . $instance . '" is not a valid instance name' );
 		}
 		$instances->{$instance} = $eve;
-	}
+	} ## end if ( defined($instance_4) )
 
 	# grab instance from -5
 	if ( defined($instance_5) ) {
@@ -514,7 +443,7 @@ elsif ( $mode eq 'manual' ) {
 			die( '"' . $instance . '" is not a valid instance name' );
 		}
 		$instances->{$instance} = $eve;
-	}
+	} ## end if ( defined($instance_5) )
 
 	# grab instance from -6
 	if ( defined($instance_6) ) {
@@ -529,7 +458,7 @@ elsif ( $mode eq 'manual' ) {
 			die( '"' . $instance . '" is not a valid instance name' );
 		}
 		$instances->{$instance} = $eve;
-	}
+	} ## end if ( defined($instance_6) )
 
 	# grab instance from -7
 	if ( defined($instance_7) ) {
@@ -544,7 +473,7 @@ elsif ( $mode eq 'manual' ) {
 			die( '"' . $instance . '" is not a valid instance name' );
 		}
 		$instances->{$instance} = $eve;
-	}
+	} ## end if ( defined($instance_7) )
 
 	# grab instance from -8
 	if ( defined($instance_8) ) {
@@ -559,7 +488,7 @@ elsif ( $mode eq 'manual' ) {
 			die( '"' . $instance . '" is not a valid instance name' );
 		}
 		$instances->{$instance} = $eve;
-	}
+	} ## end if ( defined($instance_8) )
 
 	# grab instance from -9
 	if ( defined($instance_9) ) {
@@ -574,9 +503,8 @@ elsif ( $mode eq 'manual' ) {
 			die( '"' . $instance . '" is not a valid instance name' );
 		}
 		$instances->{$instance} = $eve;
-	}
-}
-else {
+	} ## end if ( defined($instance_9) )
+} else {
 	die( '"' . $mode . '" is not a understood mode' );
 }
 
