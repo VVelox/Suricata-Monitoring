@@ -6,7 +6,8 @@ use Getopt::Long;
 use File::Slurp;
 use Suricata::Monitoring;
 use MIME::Base64;
-use Hash::Flatten      qw(:all) use Pod::Usage;
+use Hash::Flatten qw(:all);
+use Pod::Usage;
 use IO::Compress::Gzip qw(gzip $GzipError);
 
 =head1 NAME
