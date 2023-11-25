@@ -16,11 +16,11 @@ Suricata::Monitoring - LibreNMS JSON SNMP extend and Nagios style check for Suri
 
 =head1 VERSION
 
-Version 0.3.1
+Version 1.0.0
 
 =cut
 
-our $VERSION = '0.3.1';
+our $VERSION = '1.0.0';
 
 =head1 SYNOPSIS
 
@@ -58,31 +58,30 @@ The only must have is 'files'.
     - mode :: Wether the print_output output should be for Nagios or LibreNMS.
       - value :: 'librenms' or 'nagios'
       - Default :: librenms
-    
+
     - drop_percent_warn :: Drop percent warning threshold.
-      - Default :: .75;
-	
+      - Default :: .75
+
     - drop_percent_crit :: Drop percent critical threshold.
       - Default :: 1
-	
+
     - error_delta_warn :: Error delta warning threshold.
       - Default :: 1
-    
+
     - error_delta_crit :: Error delta critical threshold.
       - Default :: 2
-    
+
     - error_percent_warn :: Error percent warning threshold.
       - Default :: .05
-    
+
     - error_percent_crit :: Error percent critical threshold.
       - Default :: .1
-    
+
     - max_age :: How far back to read in seconds.
       - Default :: 360
-    
+
     - files :: A hash with the keys being the instance name and the values
-      being the Eve files to read. ".total" is not a valid instance name.
-      Similarly anything starting with a "." should be considred reserved.
+      being the Eve files to read.
 
     my $args = {
         mode               => 'librenms',
@@ -111,20 +110,21 @@ sub new {
 
 	# init the object
 	my $self = {
-		'drop_percent_warn'  => '.75',
-		'drop_percent_crit'  => '1',
-		'error_delta_warn'   => '1',
-		'error_delta_crit'   => '2',
-		'error_percent_warn' => '0.05',
-		'error_percent_crit' => '0.1',
-		max_age              => 360,
-		mode                 => 'librenms',
+		drop_percent_warn  => .75,
+		drop_percent_crit  => 1,
+		error_delta_warn   => 1,
+		error_delta_crit   => 2,
+		error_percent_warn => 0.05,
+		error_percent_crit => 0.1,
+		max_age            => 360,
+		mode               => 'librenms',
+		cache_dir          => '/var/cache/suricata-monitoring/',
 	};
 	bless $self;
 
 	# reel in the numeric args
 	my @num_args = (
-		'drop_percent_warn',  'drop_percent_crit', 'error_delta_warn', 'error_delta_crit',
+		'drop_percent_warn',  'drop_percent_crit',  'error_delta_warn', 'error_delta_crit',
 		'error_percent_warn', 'error_percent_crit', 'max_age'
 	);
 	for my $num_arg (@num_args) {
@@ -144,8 +144,7 @@ sub new {
 		)
 	{
 		confess( '"' . $args{mode} . '" is not a understood mode' );
-	}
-	elsif ( defined( $args{mode} ) ) {
+	} elsif ( defined( $args{mode} ) ) {
 		$self->{mode} = $args{mode};
 	}
 
@@ -154,30 +153,24 @@ sub new {
 		|| ( !defined( keys( %{ $args{files} } ) ) ) )
 	{
 		confess('No files specified');
-	}
-	else {
+	} else {
 		$self->{files} = $args{files};
 	}
 
-	if ( defined( $self->{files}{'.total'} ) ) {
-		confess('".total" is not a valid instance name');
-	}
-
 	# pull in cache dir location
-	if ( !defined( $args{cache_dir} ) ) {
-		$args{cache_dir} = '/var/cache/suricata-monitoring/';
+	if ( defined( $args{cache_dir} ) ) {
+		$self->{cache_dir} = $args{cache_dir};
 	}
-	$self->{cache_dir} = $args{cache_dir};
 
 	# if the cache dir does not exist, try to create it
 	if ( !-d $self->{cache_dir} ) {
 		make_path( $self->{cache_dir} )
 			or confess(
-			'"' . $args{cache_dir} . '" does not exist or is not a directory and could not be create... ' . $@ );
+				'"' . $args{cache_dir} . '" does not exist or is not a directory and could not be create... ' . $@ );
 	}
 
 	return $self;
-}
+} ## end sub new
 
 =head2 run
 
@@ -217,7 +210,7 @@ sub run {
 			$self->{results} = $to_return;
 			return $to_return;
 		}
-	}
+	} ## end if ( -f $previous_file )
 
 	# figure out the time slot we care about
 	my $from = time;
@@ -280,11 +273,10 @@ sub run {
 
 					if ( $timestamp =~ /\+/ ) {
 						$current_till = $till + $second_diff;
-					}
-					else {
+					} else {
 						$current_till = $till - $second_diff;
 					}
-				}
+				} ## end if ( !defined($current_till) && defined($timestamp...))
 				$timestamp =~ s/\..*$//;
 				my $t = Time::Piece->strptime( $timestamp, '%Y-%m-%dT%H:%M:%S' );
 
@@ -389,24 +381,23 @@ sub run {
 						# find the change for packet count
 						if ( $new_stats->{packets} < $previous->{data}{$instance}{packets} ) {
 							$new_stats->{packet_delta} = $new_stats->{packets};
-						}
-						else {
-							$new_stats->{packet_delta} = $new_stats->{packets} - $previous->{data}{$instance}{packets};
+						} else {
+							$new_stats->{packet_delta}
+								= $new_stats->{packets} - $previous->{data}{$instance}{packets};
 						}
 
 						# find the change for drop count
 						if ( $new_stats->{dropped} < $previous->{data}{$instance}{dropped} ) {
 							$new_stats->{drop_delta} = $new_stats->{dropped};
-						}
-						else {
-							$new_stats->{drop_delta} = $new_stats->{dropped} - $previous->{data}{$instance}{dropped};
+						} else {
+							$new_stats->{drop_delta}
+								= $new_stats->{dropped} - $previous->{data}{$instance}{dropped};
 						}
 
 						# find the change for ifdrop count
 						if ( $new_stats->{ifdropped} < $previous->{data}{$instance}{ifdropped} ) {
 							$new_stats->{ifdrop_delta} = $new_stats->{ifdropped};
-						}
-						else {
+						} else {
 							$new_stats->{ifdrop_delta}
 								= $new_stats->{ifdropped} - $previous->{data}{$instance}{ifdropped};
 						}
@@ -414,8 +405,7 @@ sub run {
 						# find the change for errors count
 						if ( $new_stats->{errors} < $previous->{data}{$instance}{errors} ) {
 							$new_stats->{error_delta} = $new_stats->{errors};
-						}
-						else {
+						} else {
 							$new_stats->{error_delta} = $new_stats->{errors} - $previous->{data}{$instance}{errors};
 						}
 
@@ -450,7 +440,7 @@ sub run {
 									. ' drop_percent warning '
 									. $new_stats->{drop_percent} . ' >= '
 									. $self->{drop_percent_warn} );
-						}
+						} ## end if ( $new_stats->{drop_percent} >= $self->...)
 						if ( $new_stats->{drop_percent} >= $self->{drop_percent_crit} ) {
 							$new_stats->{alert} = 2;
 							push( @new_alerts,
@@ -470,7 +460,7 @@ sub run {
 									. ' ifdrop_percent warning '
 									. $new_stats->{ifdrop_percent} . ' >= '
 									. $self->{drop_percent_warn} );
-						}
+						} ## end if ( $new_stats->{ifdrop_percent} >= $self...)
 						if ( $new_stats->{ifdrop_percent} >= $self->{drop_percent_crit} ) {
 							$new_stats->{alert} = 2;
 							push( @new_alerts,
@@ -490,7 +480,7 @@ sub run {
 									. ' error_delta warning '
 									. $new_stats->{error_delta} . ' >= '
 									. $self->{error_delta_warn} );
-						}
+						} ## end if ( $new_stats->{error_delta} >= $self->{...})
 						if ( $new_stats->{error_delta} >= $self->{error_delta_crit} ) {
 							$new_stats->{alert} = 2;
 							push( @new_alerts,
@@ -510,7 +500,7 @@ sub run {
 									. ' error_percent warning '
 									. $new_stats->{error_percent} . ' >= '
 									. $self->{error_percent_warn} );
-						}
+						} ## end if ( $new_stats->{error_percent} >= $self->...)
 						if ( $new_stats->{error_percent} >= $self->{error_percent_crit} ) {
 							$new_stats->{alert} = 2;
 							push( @new_alerts,
@@ -526,7 +516,7 @@ sub run {
 							$new_stats->{alertString} = join( "\n", @new_alerts );
 							push( @alerts, @new_alerts );
 						}
-					}
+					} ## end if ( defined($previous) && defined( $previous...))
 
 					# add stuff to .total
 					my @intance_keys = keys( %{$new_stats} );
@@ -534,24 +524,23 @@ sub run {
 						if ( $total_key ne 'alertString' ) {
 							if ( !defined( $to_return->{data}{'.total'}{$total_key} ) ) {
 								$to_return->{data}{'.total'}{$total_key} = $new_stats->{$total_key};
-							}
-							else {
+							} else {
 								$to_return->{data}{'.total'}{$total_key}
 									= $to_return->{data}{'.total'}{$total_key} + $new_stats->{$total_key};
 							}
 						}
-					}
+					} ## end foreach my $total_key (@intance_keys)
 
 					$to_return->{data}{$instance} = $new_stats;
-				}
+				} ## end if ( defined( $json->{event_type} ) && $json...)
 
 			};
 
 			# get the next line
 			$line = $bw->readline;
-		}
+		} ## end while ( $process_it && defined($line) )
 
-	}
+	} ## end foreach my $instance (@instances)
 
 	# compute percents for .total
 	if ( defined( $to_return->{data}{'.total'}{packet_delta} )
@@ -568,8 +557,7 @@ sub run {
 		$to_return->{data}{'.total'}{error_percent}
 			= ( $to_return->{data}{'.total'}{error_delta} / $to_return->{data}{'.total'}{packet_delta} ) * 100;
 		$to_return->{data}{'.total'}{error_percent} = sprintf( '%0.5f', $to_return->{data}{'.total'}{error_percent} );
-	}
-	else {
+	} else {
 		$to_return->{alert} = '3';
 		push( @alerts, 'Did not find a stats entry after searching back ' . $self->{max_age} . ' seconds' );
 	}
@@ -594,16 +582,15 @@ sub run {
 		$to_return->{alert} = '3';
 		if ( $to_return->{alertString} eq '' ) {
 			$to_return->{alertString} = $to_return->{errorString};
-		}
-		else {
+		} else {
 			$to_return->{alertString} = $to_return->{errorString} . "\n" . $to_return->{alertString};
 		}
-	}
+	} ## end if ($@)
 
 	$self->{results} = $to_return;
 
 	return $to_return;
-}
+} ## end sub run
 
 =head2 print_output
 
@@ -620,25 +607,21 @@ sub print_output {
 		if ( $self->{results}{alert} eq '0' ) {
 			print "OK - no alerts\n";
 			return;
-		}
-		elsif ( $self->{results}{alert} eq '1' ) {
+		} elsif ( $self->{results}{alert} eq '1' ) {
 			print 'WARNING - ';
-		}
-		elsif ( $self->{results}{alert} eq '2' ) {
+		} elsif ( $self->{results}{alert} eq '2' ) {
 			print 'CRITICAL - ';
-		}
-		elsif ( $self->{results}{alert} eq '3' ) {
+		} elsif ( $self->{results}{alert} eq '3' ) {
 			print 'UNKNOWN - ';
 		}
 		my $alerts = $self->{results}{alertString};
 		chomp($alerts);
 		$alerts = s/\n/\, /g;
 		print $alerts. "\n";
-	}
-	else {
+	} else {
 		print encode_json( $self->{results} ) . "\n";
 	}
-}
+} ## end sub print_output
 
 =head1 LibreNMS HASH
 
