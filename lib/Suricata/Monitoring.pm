@@ -187,7 +187,10 @@ sub run {
 
 	# this will be returned
 	my $to_return = {
-		data        => { '.total' => {} },
+		data => {
+			total     => {},
+			instances => {},
+		},
 		version     => 1,
 		error       => '0',
 		errorString => '',
@@ -219,8 +222,10 @@ sub run {
 	# process the files for each instance
 	my @instances = keys( %{ $self->{files} } );
 	my @alerts;
-	my $current_till;
 	foreach my $instance (@instances) {
+
+		# if we found it or not
+		my $found = 0;
 
 		# ends processing for this file
 		my $process_it = 1;
@@ -251,316 +256,45 @@ sub run {
 			eval {
 				my $json      = decode_json($line);
 				my $timestamp = $json->{timestamp};
-
-				# if current till is not set, set it
-				if (  !defined($current_till)
-					&& defined($timestamp)
-					&& $timestamp =~ /^[0-9]+\-[0-9]+\-[0-9]+T[0-9]+\:[0-9]+\:[0-9\.]+[\-\+][0-9]+/ )
-				{
-
-					# get the number of hours
-					my $hours = $timestamp;
-					$hours =~ s/.*[\-\+]//g;
-					$hours =~ s/^0//;
-					$hours =~ s/[0-9][0-9]$//;
-
-					# get the number of minutes
-					my $minutes = $timestamp;
-					$minutes =~ s/.*[\-\+]//g;
-					$minutes =~ s/^[0-9][0-9]//;
-
-					my $second_diff = ( $minutes * 60 ) + ( $hours * 60 * 60 );
-
-					if ( $timestamp =~ /\+/ ) {
-						$current_till = $till + $second_diff;
-					} else {
-						$current_till = $till - $second_diff;
-					}
-				} ## end if ( !defined($current_till) && defined($timestamp...))
-				$timestamp =~ s/\..*$//;
-				my $t = Time::Piece->strptime( $timestamp, '%Y-%m-%dT%H:%M:%S' );
+				$timestamp =~ s/\.[0-9]*//;
+				my $t = Time::Piece->strptime( $timestamp, '%Y-%m-%dT%H:%M:%S%z' );
 
 				# stop process further lines as we've hit the oldest we care about
-				if ( $t->epoch <= $current_till ) {
+				if ( $t->epoch <= $till ) {
 					$process_it = 0;
 				}
 
-				# we found the entry we are looking for if
-				# this matches, so process it
-				if ( defined( $json->{event_type} )
-					&& $json->{event_type} eq 'stats' )
-				{
-					# we can stop processing now as this is what we were looking for
-					$process_it = 0;
-
-					# holds the found new alerts
-					my @new_alerts;
-
-					my $new_stats = {
-						uptime             => $json->{stats}{uptime},
-						packets            => $json->{stats}{capture}{kernel_packets},
-						dropped            => $json->{stats}{capture}{kernel_drops},
-						ifdropped          => $json->{stats}{capture}{kernel_ifdrops},
-						errors             => $json->{stats}{capture}{errors},
-						packet_delta       => 0,
-						drop_delta         => 0,
-						ifdrop_delta       => 0,
-						error_delta        => 0,
-						drop_percent       => 0,
-						ifdrop_percent     => 0,
-						error_percent      => 0,
-						bytes              => $json->{stats}{decoder}{bytes},
-						dec_packets        => $json->{stats}{decoder}{pkts},
-						dec_invalid        => $json->{stats}{decoder}{invalid},
-						dec_ipv4           => $json->{stats}{decoder}{ipv4},
-						dec_ipv6           => $json->{stats}{decoder}{ipv6},
-						dec_udp            => $json->{stats}{decoder}{udp},
-						dec_tcp            => $json->{stats}{decoder}{tcp},
-						dec_avg_pkt_size   => $json->{stats}{decoder}{avg_pkt_size},
-						dec_max_pkt_size   => $json->{stats}{decoder}{max_pkt_size},
-						dec_chdlc          => $json->{stats}{decoder}{chdlc},
-						dec_ethernet       => $json->{stats}{decoder}{ethernet},
-						dec_geneve         => $json->{stats}{decoder}{geneve},
-						dec_ieee8021ah     => $json->{stats}{decoder}{ieee8021ah},
-						dec_ipv4_in_ipv6   => $json->{stats}{decoder}{ipv6_in_ipv6},
-						dec_mx_mac_addrs_d => $json->{stats}{decoder}{max_mac_addrs_dst},
-						dec_mx_mac_addrs_s => $json->{stats}{decoder}{max_mac_addrs_src},
-						dec_mpls           => $json->{stats}{decoder}{mpls},
-						dec_ppp            => $json->{stats}{decoder}{ppp},
-						dec_pppoe          => $json->{stats}{decoder}{pppoe},
-						dec_raw            => $json->{stats}{decoder}{raw},
-						dec_sctp           => $json->{stats}{decoder}{sctp},
-						dec_sll            => $json->{stats}{decoder}{sll},
-						dec_teredo         => $json->{stats}{decoder}{teredo},
-						dec_too_many_layer => $json->{stats}{decoder}{too_many_layers},
-						dec_vlan           => $json->{stats}{decoder}{vlan},
-						dec_vlan_qinq      => $json->{stats}{decoder}{vlan_qinq},
-						dec_vntag          => $json->{stats}{decoder}{vntag},
-						dec_vxlan          => $json->{stats}{decoder}{vxlan},
-						f_tcp              => $json->{stats}{flow}{tcp},
-						f_udp              => $json->{stats}{flow}{udp},
-						f_icmpv4           => $json->{stats}{flow}{icmpv4},
-						f_icmpv6           => $json->{stats}{flow}{icmpv6},
-						f_memuse           => $json->{stats}{flow}{memuse},
-						ftp_memuse         => $json->{stats}{ftp}{memuse},
-						http_memuse        => $json->{stats}{http}{memuse},
-						tcp_memuse         => $json->{stats}{tcp}{memuse},
-						tcp_reass_memuse   => $json->{stats}{tcp}{reassembly_memuse},
-						alert              => 0,
-						alertString        => '',
-					};
-
-					foreach my $flow_key ( keys( %{ $json->{stats}{app_layer}{flow} } ) ) {
-						my $new_key = $flow_key;
-						$new_key =~ s/\-/_/g;
-						$new_stats->{ 'af_' . $new_key } = $json->{stats}{app_layer}{flow}{$flow_key};
-					}
-					foreach my $tx_key ( keys( %{ $json->{stats}{app_layer}{tx} } ) ) {
-						my $new_key = $tx_key;
-						$new_key =~ s/\-/_/g;
-						$new_stats->{ 'at_' . $new_key } = $json->{stats}{app_layer}{tx}{$tx_key};
-					}
-
-					# some this is a bit variable as to which will be present based on the system
-					# af-packet = error
-					# pcap = ifdrops
-					my @zero_if_undef = ( 'errors', 'ifdropped' );
-					foreach my $undef_check (@zero_if_undef) {
-						if ( !defined( $new_stats->{$undef_check} ) ) {
-							$new_stats->{$undef_check} = 0;
-						}
-					}
-
-					# begin handling this if we have previous values
-					if (   defined($previous)
-						&& defined( $previous->{data}{$instance} )
-						&& defined( $previous->{data}{$instance}{packets} )
-						&& defined( $previous->{data}{$instance}{bytes} )
-						&& defined( $previous->{data}{$instance}{dropped} ) )
-					{
-						# find the change for packet count
-						if ( $new_stats->{packets} < $previous->{data}{$instance}{packets} ) {
-							$new_stats->{packet_delta} = $new_stats->{packets};
-						} else {
-							$new_stats->{packet_delta}
-								= $new_stats->{packets} - $previous->{data}{$instance}{packets};
-						}
-
-						# find the change for drop count
-						if ( $new_stats->{dropped} < $previous->{data}{$instance}{dropped} ) {
-							$new_stats->{drop_delta} = $new_stats->{dropped};
-						} else {
-							$new_stats->{drop_delta}
-								= $new_stats->{dropped} - $previous->{data}{$instance}{dropped};
-						}
-
-						# find the change for ifdrop count
-						if ( $new_stats->{ifdropped} < $previous->{data}{$instance}{ifdropped} ) {
-							$new_stats->{ifdrop_delta} = $new_stats->{ifdropped};
-						} else {
-							$new_stats->{ifdrop_delta}
-								= $new_stats->{ifdropped} - $previous->{data}{$instance}{ifdropped};
-						}
-
-						# find the change for errors count
-						if ( $new_stats->{errors} < $previous->{data}{$instance}{errors} ) {
-							$new_stats->{error_delta} = $new_stats->{errors};
-						} else {
-							$new_stats->{error_delta} = $new_stats->{errors} - $previous->{data}{$instance}{errors};
-						}
-
-						# find the percent of dropped
-						if ( $new_stats->{drop_delta} != 0 ) {
-							$new_stats->{drop_percent}
-								= ( $new_stats->{drop_delta} / $new_stats->{packet_delta} ) * 100;
-							$new_stats->{drop_percent} = sprintf( '%0.5f', $new_stats->{drop_percent} );
-						}
-
-						# find the percent of dropped
-						if ( $new_stats->{ifdrop_delta} != 0 ) {
-							$new_stats->{ifdrop_percent}
-								= ( $new_stats->{ifdrop_delta} / $new_stats->{ifpacket_delta} ) * 100;
-							$new_stats->{ifdrop_percent} = sprintf( '%0.5f', $new_stats->{ifdrop_percent} );
-						}
-
-						# find the percent of errored
-						if ( $new_stats->{error_delta} != 0 ) {
-							$new_stats->{error_percent}
-								= ( $new_stats->{error_delta} / $new_stats->{packet_delta} ) * 100;
-							$new_stats->{error_percent} = sprintf( '%0.5f', $new_stats->{error_percent} );
-						}
-
-						# check for drop percent alerts
-						if (   $new_stats->{drop_percent} >= $self->{drop_percent_warn}
-							&& $new_stats->{drop_percent} < $self->{drop_percent_crit} )
+				# this is stats and we should be processing it, continue
+				if ( $process_it && defined( $json->{event_type} ) && $json->{event_type} eq 'stats' ) {
+					$found                                   = 1;
+					$process_it                              = 0;
+					$to_return->{data}{instances}{$instance} = flatten(
+						$json->{stats},
 						{
-							$new_stats->{alert} = 1;
-							push( @new_alerts,
-									  $instance
-									. ' drop_percent warning '
-									. $new_stats->{drop_percent} . ' >= '
-									. $self->{drop_percent_warn} );
-						} ## end if ( $new_stats->{drop_percent} >= $self->...)
-						if ( $new_stats->{drop_percent} >= $self->{drop_percent_crit} ) {
-							$new_stats->{alert} = 2;
-							push( @new_alerts,
-									  $instance
-									. ' drop_percent critical '
-									. $new_stats->{drop_percent} . ' >= '
-									. $self->{drop_percent_crit} );
+							HashDelimiter => '__',
 						}
-
-						# check for drop percent alerts
-						if (   $new_stats->{ifdrop_percent} >= $self->{drop_percent_warn}
-							&& $new_stats->{ifdrop_percent} < $self->{drop_percent_crit} )
-						{
-							$new_stats->{alert} = 1;
-							push( @new_alerts,
-									  $instance
-									. ' ifdrop_percent warning '
-									. $new_stats->{ifdrop_percent} . ' >= '
-									. $self->{drop_percent_warn} );
-						} ## end if ( $new_stats->{ifdrop_percent} >= $self...)
-						if ( $new_stats->{ifdrop_percent} >= $self->{drop_percent_crit} ) {
-							$new_stats->{alert} = 2;
-							push( @new_alerts,
-									  $instance
-									. ' ifdrop_percent critical '
-									. $new_stats->{ifdrop_percent} . ' >= '
-									. $self->{drop_percent_crit} );
-						}
-
-						# check for error delta alerts
-						if (   $new_stats->{error_delta} >= $self->{error_delta_warn}
-							&& $new_stats->{error_delta} < $self->{error_delta_crit} )
-						{
-							$new_stats->{alert} = 1;
-							push( @new_alerts,
-									  $instance
-									. ' error_delta warning '
-									. $new_stats->{error_delta} . ' >= '
-									. $self->{error_delta_warn} );
-						} ## end if ( $new_stats->{error_delta} >= $self->{...})
-						if ( $new_stats->{error_delta} >= $self->{error_delta_crit} ) {
-							$new_stats->{alert} = 2;
-							push( @new_alerts,
-									  $instance
-									. ' error_delta critical '
-									. $new_stats->{error_delta} . ' >= '
-									. $self->{error_delta_crit} );
-						}
-
-						# check for drop percent alerts
-						if (   $new_stats->{error_percent} >= $self->{error_percent_warn}
-							&& $new_stats->{error_percent} < $self->{error_percent_crit} )
-						{
-							$new_stats->{alert} = 1;
-							push( @new_alerts,
-									  $instance
-									. ' error_percent warning '
-									. $new_stats->{error_percent} . ' >= '
-									. $self->{error_percent_warn} );
-						} ## end if ( $new_stats->{error_percent} >= $self->...)
-						if ( $new_stats->{error_percent} >= $self->{error_percent_crit} ) {
-							$new_stats->{alert} = 2;
-							push( @new_alerts,
-									  $instance
-									. ' error_percent critical '
-									. $new_stats->{error_percent} . ' >= '
-									. $self->{error_percent_crit} );
-						}
-
-						# check for alert status
-						if ( $new_stats->{alert} > $to_return->{alert} ) {
-							$to_return->{alert}       = $new_stats->{alert};
-							$new_stats->{alertString} = join( "\n", @new_alerts );
-							push( @alerts, @new_alerts );
-						}
-					} ## end if ( defined($previous) && defined( $previous...))
-
-					# add stuff to .total
-					my @intance_keys = keys( %{$new_stats} );
-					foreach my $total_key (@intance_keys) {
-						if ( $total_key ne 'alertString' ) {
-							if ( !defined( $to_return->{data}{'.total'}{$total_key} ) ) {
-								$to_return->{data}{'.total'}{$total_key} = $new_stats->{$total_key};
-							} else {
-								$to_return->{data}{'.total'}{$total_key}
-									= $to_return->{data}{'.total'}{$total_key} + $new_stats->{$total_key};
-							}
-						}
-					} ## end foreach my $total_key (@intance_keys)
-
-					$to_return->{data}{$instance} = $new_stats;
-				} ## end if ( defined( $json->{event_type} ) && $json...)
-
+					);
+				} ## end if ( $process_it && defined( $json->{event_type...}))
 			};
+
+			# if we did not find it, error... either Suricata is not running or stats is not output interval for
+			# it is to low... needs to be under 5 minutes to function meaningfully for this
+			if ( !$found && !$process_it ) {
+				push( @alerts,
+						  'Did not find a stats entry for instance "'
+						. $instance
+						. '" in "'
+						. $self->{files}{$instance}
+						. '" going back "'
+						. $self->{max_age}
+						. '" seconds' );
+			} ## end if ( !$found && !$process_it )
 
 			# get the next line
 			$line = $bw->readline;
 		} ## end while ( $process_it && defined($line) )
 
 	} ## end foreach my $instance (@instances)
-
-	# compute percents for .total
-	if ( defined( $to_return->{data}{'.total'}{packet_delta} )
-		&& ( $to_return->{data}{'.total'}{packet_delta} != 0 ) )
-	{
-		$to_return->{data}{'.total'}{drop_percent}
-			= ( $to_return->{data}{'.total'}{drop_delta} / $to_return->{data}{'.total'}{packet_delta} ) * 100;
-		$to_return->{data}{'.total'}{drop_percent} = sprintf( '%0.5f', $to_return->{data}{'.total'}{drop_percent} );
-
-		$to_return->{data}{'.total'}{ifdrop_percent}
-			= ( $to_return->{data}{'.total'}{ifdrop_delta} / $to_return->{data}{'.total'}{packet_delta} ) * 100;
-		$to_return->{data}{'.total'}{ifdrop_percent} = sprintf( '%0.5f', $to_return->{data}{'.total'}{ifdrop_percent} );
-
-		$to_return->{data}{'.total'}{error_percent}
-			= ( $to_return->{data}{'.total'}{error_delta} / $to_return->{data}{'.total'}{packet_delta} ) * 100;
-		$to_return->{data}{'.total'}{error_percent} = sprintf( '%0.5f', $to_return->{data}{'.total'}{error_percent} );
-	} else {
-		$to_return->{alert} = '3';
-		push( @alerts, 'Did not find a stats entry after searching back ' . $self->{max_age} . ' seconds' );
-	}
 
 	# join any found alerts into the string
 	$to_return->{alertString} = join( "\n", @alerts );
