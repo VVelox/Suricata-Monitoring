@@ -396,6 +396,8 @@ sub run {
 								push( @alerts,
 										  'CRITICAL - '
 										. $item
+										. ' for instance '
+										. $instance
 										. ' has a drop percent greater than '
 										. $self->{drop_percent_crit} );
 							} elsif ( $drop_percent >= $self->{drop_percent_warn} ) {
@@ -405,6 +407,8 @@ sub run {
 								push( @alerts,
 										  'WARNING - '
 										. $item
+										. ' for instance '
+										. $instance
 										. ' has a error delta greater than '
 										. $self->{drop_percent_warn} );
 							} ## end elsif ( $drop_percent >= $self->{drop_percent_warn...})
