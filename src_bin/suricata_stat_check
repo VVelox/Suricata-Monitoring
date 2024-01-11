@@ -14,12 +14,6 @@ use IO::Compress::Gzip qw(gzip $GzipError);
 
 suricata_stat_check - LibreNMS JSON SNMP extend and Nagios style check for Suricata stats.
 
-=cut
-
-sub version {
-	print "suricata_stat_check v. 0.1.0\n";
-}
-
 =head1 SYNOPSIS
 
 suricata_stats_check [B<-m> single] [B<-s> <eve>] [B<-S> <instance name>] [B<-d> <drop percent warn>]
@@ -218,6 +212,10 @@ eve file. So "inet,/var/log/suricata/inet.json" would be a instance
 name of "inet" with a eve file of "/var/log/suricata/inet.json".
 
 =cut
+
+sub version {
+	print 'suricata_stat_check v. '.$Suricata::Monitoring::VERSION."\n";
+}
 
 sub help {
 	pod2usage( -exitval => 255, -verbose => 2, -output => \*STDOUT, );

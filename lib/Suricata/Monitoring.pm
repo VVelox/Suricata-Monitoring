@@ -9,6 +9,7 @@ use File::ReadBackwards;
 use Carp;
 use File::Slurp;
 use Time::Piece;
+use Hash::Flatten qw(:all);
 
 =head1 NAME
 
@@ -32,8 +33,7 @@ our $VERSION = '1.0.0';
         drop_percent_crit  => 1,
         error_delta_warn   => 1,
         error_delta_crit   => 2,
-        error_percent_warn => .05,
-        error_percent_crit => .1,
+        error_ignore=>[],
         files=>{
                'ids'=>'/var/log/suricata/alert-ids.json',
                'foo'=>'/var/log/suricata/alert-foo.json',
@@ -71,12 +71,6 @@ The only must have is 'files'.
     - error_delta_crit :: Error delta critical threshold.
       - Default :: 2
 
-    - error_percent_warn :: Error percent warning threshold.
-      - Default :: .05
-
-    - error_percent_crit :: Error percent critical threshold.
-      - Default :: .1
-
     - max_age :: How far back to read in seconds.
       - Default :: 360
 
@@ -89,9 +83,8 @@ The only must have is 'files'.
         drop_percent_crit  => 1,
         error_delta_warn   => 1,
         error_delta_crit   => 2,
-        error_percent_warn => .05,
-        error_percent_crit => .1,
         max_age            => 360,
+        error_ignore=>[],
         files=>{
                'ids'=>'/var/log/suricata/alert-ids.json',
                'foo'=>'/var/log/suricata/alert-foo.json',
@@ -188,14 +181,14 @@ sub run {
 	# this will be returned
 	my $to_return = {
 		data => {
-			total     => {},
-			instances => {},
+			totals      => { drop_percent => 0, drop_percent => 0, },
+			instances   => {},
+			alert       => 0,
+			alertString => ''
 		},
 		version     => 1,
-		error       => '0',
+		error       => 0,
 		errorString => '',
-		alert       => '0',
-		alertString => ''
 	};
 
 	my $previous;
@@ -258,7 +251,6 @@ sub run {
 				my $timestamp = $json->{timestamp};
 				$timestamp =~ s/\.[0-9]*//;
 				my $t = Time::Piece->strptime( $timestamp, '%Y-%m-%dT%H:%M:%S%z' );
-
 				# stop process further lines as we've hit the oldest we care about
 				if ( $t->epoch <= $till ) {
 					$process_it = 0;
@@ -266,12 +258,15 @@ sub run {
 
 				# this is stats and we should be processing it, continue
 				if ( $process_it && defined( $json->{event_type} ) && $json->{event_type} eq 'stats' ) {
+					# an array that we don't really want
+					delete( $json->{stats}{detect}{engines} );
 					$found                                   = 1;
 					$process_it                              = 0;
 					$to_return->{data}{instances}{$instance} = flatten(
-						$json->{stats},
+						\%{ $json->{stats} },
 						{
-							HashDelimiter => '__',
+							HashDelimiter  => '__',
+							ArrayDelimiter => '@@@',
 						}
 					);
 				} ## end if ( $process_it && defined( $json->{event_type...}))
@@ -296,11 +291,36 @@ sub run {
 
 	} ## end foreach my $instance (@instances)
 
+	#
+	#
+	# put totals together
+	#
+	#
+	foreach my $instance (@instances) {
+		my @vars = keys( %{ $to_return->{data}{instances}{$instance} } );
+		foreach my $var (@vars) {
+			# remove it if is from a array that was missed
+			if ( $var =~ /\@\@\@/ ) {
+				delete( $to_return->{data}{instances}{$instance}{$var} );
+			} else {
+				if ( !defined( $to_return->{data}{totals}{$var} ) ) {
+					$to_return->{data}{totals}{$var} = $to_return->{data}{instances}{$instance}{$var};
+				} else {
+					$to_return->{data}{totals}{$var}
+						= $to_return->{data}{totals}{$var} + $to_return->{data}{instances}{$instance}{$var};
+				}
+			}
+		} ## end foreach my $var (@vars)
+	} ## end foreach my $instance (@instances)
+
 	# join any found alerts into the string
 	$to_return->{alertString} = join( "\n", @alerts );
-	$to_return->{data}{'.total'}{alert} = $to_return->{'alert'};
 
+	#
+	#
 	# write the cache file on out
+	#
+	#
 	eval {
 		my $new_cache = encode_json($to_return);
 		open( my $fh, '>', $previous_file );
@@ -309,15 +329,15 @@ sub run {
 	};
 	if ($@) {
 		$to_return->{error}       = '1';
-		$to_return->{alert}       = '3';
+		$to_return->{data}{alert}       = '3';
 		$to_return->{errorString} = 'Failed to write new cache JSON file, "' . $previous_file . '".... ' . $@;
 
 		# set the nagious style alert stuff
 		$to_return->{alert} = '3';
-		if ( $to_return->{alertString} eq '' ) {
-			$to_return->{alertString} = $to_return->{errorString};
+		if ( $to_return->{data}{alertString} eq '' ) {
+			$to_return->{data}{alertString} = $to_return->{errorString};
 		} else {
-			$to_return->{alertString} = $to_return->{errorString} . "\n" . $to_return->{alertString};
+			$to_return->{data}{alertString} = $to_return->{errorString} . "\n" . $to_return->{alertString};
 		}
 	} ## end if ($@)
 
@@ -364,72 +384,6 @@ sub print_output {
       - 1 :: WARNING
       - 2 :: CRITICAL
       - 3 :: UNKNOWN
-    
-    + $hash{'alertString'} :: A string describing the alert. Defaults to
-      '' if there is no alert.
-    
-    + $hash{'error'} :: A integer representing a error. '0' represents
-      everything is fine.
-    
-    + $hash{'errorString'} :: A string description of the error.
-    
-    + $hash{'data'}{$instance} :: Values migrated from the
-      instance. *_delta values are created via computing the difference
-      from the previously saved info. *_percent is based off of the delta
-      in question over the packet delta. Delta are created for packet,
-      drop, ifdrop, and error. Percents are made for drop, ifdrop, and
-      error.
-    
-    + $hash{'data'}{'.total'} :: Total values of from all the
-      intances. Any percents will be recomputed.
-    
-
-    The stat keys are migrated as below.
-    
-    uptime           => $json->{stats}{uptime},
-    packets          => $json->{stats}{capture}{kernel_packets},
-    dropped          => $json->{stats}{capture}{kernel_drops},
-    ifdropped        => $json->{stats}{capture}{kernel_ifdrops},
-    errors           => $json->{stats}{capture}{errors},
-    bytes            => $json->{stats}{decoder}{bytes},
-    dec_packets      => $json->{stats}{decoder}{pkts},
-    dec_invalid      => $json->{stats}{decoder}{invalid},
-    dec_ipv4         => $json->{stats}{decoder}{ipv4},
-    dec_ipv6         => $json->{stats}{decoder}{ipv6},
-    dec_udp          => $json->{stats}{decoder}{udp},
-    dec_tcp          => $json->{stats}{decoder}{tcp},
-    dec_avg_pkt_size => $json->{stats}{decoder}{avg_pkt_size},
-    dec_max_pkt_size => $json->{stats}{decoder}{max_pkt_size},
-    dec_chdlc          => $json->{stats}{decoder}{chdlc},
-    dec_ethernet       => $json->{stats}{decoder}{ethernet},
-    dec_geneve         => $json->{stats}{decoder}{geneve},
-    dec_ieee8021ah     => $json->{stats}{decoder}{ieee8021ah},
-    dec_ipv4_in_ipv6   => $json->{stats}{decoder}{ipv6_in_ipv6},
-    dec_mx_mac_addrs_d => $json->{stats}{decoder}{max_mac_addrs_dst},
-    dec_mx_mac_addrs_s => $json->{stats}{decoder}{max_mac_addrs_src},
-    dec_mpls           => $json->{stats}{decoder}{mpls},
-    dec_ppp            => $json->{stats}{decoder}{ppp},
-    dec_pppoe          => $json->{stats}{decoder}{pppoe},
-    dec_raw            => $json->{stats}{decoder}{raw},
-    dec_sctp           => $json->{stats}{decoder}{sctp},
-    dec_sll            => $json->{stats}{decoder}{sll},
-    dec_teredo         => $json->{stats}{decoder}{teredo},
-    dec_too_many_layer => $json->{stats}{decoder}{too_many_layers},
-    dec_vlan           => $json->{stats}{decoder}{vlan},
-    dec_vlan_qinq      => $json->{stats}{decoder}{vlan_qinq},
-    dec_vntag          => $json->{stats}{decoder}{vntag},
-    dec_vxlan          => $json->{stats}{decoder}{vxlan},
-    f_tcp              => $json->{stats}{flow}{tcp},
-    f_udp              => $json->{stats}{flow}{udp},
-    f_icmpv4           => $json->{stats}{flow}{icmpv4},
-    f_icmpv6           => $json->{stats}{flow}{icmpv6},
-    f_memuse           => $json->{stats}{flow}{memuse},
-    ftp_memuse         => $json->{stats}{ftp}{memuse},
-    http_memuse        => $json->{stats}{http}{memuse},
-    tcp_memuse         => $json->{stats}{tcp}{memuse},
-    tcp_reass_memuse   => $json->{stats}{tcp}{reassembly_memuse},
-    af_*               => $json->{stats}{app_layer}{flow}{*}
-    at_*               => $json->{stats}{app_layer}{tx}{*}
 
 =head1 AUTHOR
 
