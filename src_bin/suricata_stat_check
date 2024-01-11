@@ -214,7 +214,7 @@ name of "inet" with a eve file of "/var/log/suricata/inet.json".
 =cut
 
 sub version {
-	print 'suricata_stat_check v. '.$Suricata::Monitoring::VERSION."\n";
+	print 'suricata_stat_check v. ' . $Suricata::Monitoring::VERSION . "\n";
 }
 
 sub help {
@@ -270,7 +270,7 @@ GetOptions(
 	'v'       => \$version,
 	'help'    => \$help,
 	'h'       => \$help,
-	's=s'     => \$slug,
+	'slug=s'  => \$slug,
 	'm=s'     => \$mode,
 	'l=s'     => \$log_dir,
 	's=s'     => \$single_eve,
