@@ -527,5 +527,5 @@ if ($nagios) {
 my $sm       = Suricata::Monitoring->new($args);
 my $returned = $sm->run;
 $sm->print_output;
-exit $returned->{alert};
+exit $returned->{data}{alert};
 
