@@ -178,7 +178,7 @@ sub run {
 	# this will be returned
 	my $to_return = {
 		data => {
-			totals      => { drop_percent => 0, drop_percent => 0, error_delta => 0 },
+			totals      => { drop_percent => 0, error_delta => 0 },
 			instances   => {},
 			alert       => 0,
 			alertString => ''
@@ -340,12 +340,32 @@ sub run {
 				}
 				push( @alerts, 'WARNING - ' . $item . ' has a error delta greater than ' . $self->{error_delta_warn} );
 			}
+			$to_return->{data}{totals}{error_delta} = $to_return->{data}{totals}{error_delta} + $delta;
 		} ## end if ( defined($previous) && defined( $previous...))
 	} ## end foreach my $item (@error_keys)
+	if ( $to_return->{data}{totals}{error_delta} >= $self->{error_delta_crit} ) {
+		if ( $to_return->{data}{alert} < 2 ) {
+			$to_return->{data}{alert} = 2;
+		}
+		push( @alerts,
+				  'CRITICAL - total error delta, '
+				. $to_return->{data}{totals}{error_delta}
+				. ', greater than '
+				. $self->{error_delta_crit} );
+	} elsif ( $to_return->{data}{totals}{error_delta} >= $self->{error_delta_warn} ) {
+		if ( $to_return->{data}{alert} < 1 ) {
+			$to_return->{data}{alert} = 1;
+		}
+		push( @alerts,
+				  'WARNING - total error delta, '
+				. $to_return->{data}{totals}{error_delta}
+				. ', greater than '
+				. $self->{error_delta_warn} );
+	} ## end elsif ( $to_return->{data}{totals}{error_delta...})
 
 	#
 	#
-	# process error deltas and and look for alerts
+	# process drop precent and and look for alerts
 	#
 	#
 	my @drop_keys = [ 'capture__kernel_drops', 'capture__kernel_ifdrops' ];
@@ -391,6 +411,7 @@ sub run {
 						}
 						if ( $drop_delta > 0 ) {
 							my $drop_percent = $drop_delta / $delta;
+							$to_return->{data}{instances}{$instance}{drop_percent} = $drop_percent;
 							if ( $drop_percent >= $self->{drop_percent_crit} ) {
 								if ( $to_return->{data}{alert} < 2 ) {
 									$to_return->{data}{alert} = 2;
@@ -411,7 +432,7 @@ sub run {
 										. $item
 										. ' for instance '
 										. $instance
-										. ' has a error delta greater than '
+										. ' has a drop percent greater than '
 										. $self->{drop_percent_warn} );
 							} ## end elsif ( $drop_percent >= $self->{drop_percent_warn...})
 						} ## end if ( $drop_delta > 0 )
@@ -420,6 +441,48 @@ sub run {
 			} ## end if ( $delta > 0 )
 		} ## end if ( defined($previous) && defined( $previous...))
 	} ## end foreach my $instance (@instances)
+
+	my $delta = 0;
+	if ( $previous->{data}{totals}{capture__kernel_packets} < $to_return->{data}{totals}{capture__kernel_packets} ) {
+		my $delta
+			= $to_return->{data}{totals}{capture__kernel_packets} - $previous->{data}{totals}{capture__kernel_packets};
+	} elsif ( $previous->{data}{totals}{capture__kernel_packets} > $to_return->{data}{totals}{capture__kernel_packets} )
+	{
+		# if previous is greater, it has restarted or rolled over
+		$delta = $to_return->{data}{totals}{capture__kernel_packets};
+	}
+	foreach my $item (@drop_keys) {
+		my $drop_delta = 0;
+		if ( $previous->{data}{totals}{$item} < $to_return->{data}{totals}{$item} ) {
+			my $drop_delta = $to_return->{data}{totals}{$item} - $previous->{data}{totals}{$item};
+		} elsif ( $previous->{data}{totals}{$item} > $to_return->{data}{totals}{$item} ) {
+			# if previous is greater, it has restarted or rolled over
+			$drop_delta = $to_return->{data}{totals}{$item};
+		}
+		if ( $drop_delta > 0 ) {
+			my $drop_percent = $drop_delta / $delta;
+			$to_return->{data}{totals}{drop_percent} = $drop_percent;
+			if ( $drop_percent >= $self->{drop_percent_crit} ) {
+				if ( $to_return->{data}{alert} < 2 ) {
+					$to_return->{data}{alert} = 2;
+				}
+				push( @alerts,
+						  'CRITICAL - '
+						. $item
+						. ' for totals has a drop percent greater than '
+						. $self->{drop_percent_crit} );
+			} elsif ( $drop_percent >= $self->{drop_percent_warn} ) {
+				if ( $to_return->{data}{alert} < 1 ) {
+					$to_return->{data}{alert} = 1;
+				}
+				push( @alerts,
+						  'WARNING - '
+						. $item
+						. ' for totals has a drop percent greater than '
+						. $self->{drop_percent_warn} );
+			} ## end elsif ( $drop_percent >= $self->{drop_percent_warn...})
+		} ## end if ( $drop_delta > 0 )
+	} ## end foreach my $item (@drop_keys)
 
 	#
 	#
@@ -435,7 +498,7 @@ sub run {
 	#
 	eval {
 		my $new_cache = encode_json($to_return);
-		write_file($previous_file, $new_cache);
+		write_file( $previous_file, $new_cache );
 
 		my $compressed_string;
 		gzip \$new_cache => \$compressed_string;
@@ -444,9 +507,9 @@ sub run {
 		$compressed = $compressed . "\n";
 
 		if ( length($compressed) > length($new_cache) ) {
-			write_file($self->{cache_dir}.'/snmp', $new_cache);
+			write_file( $self->{cache_dir} . '/snmp', $new_cache );
 		} else {
-			write_file($self->{cache_dir}.'/snmp', $compressed);
+			write_file( $self->{cache_dir} . '/snmp', $compressed );
 		}
 	};
 	if ($@) {

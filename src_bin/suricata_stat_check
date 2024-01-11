@@ -17,7 +17,7 @@ suricata_stats_check [B<-m> single] [B<-s> <eve>] [B<-S> <instance name>] [B<-d>
 [B<-D> <drop percent crit>]  [B<-e> <error delta warn>] [B<-E> <error delta crit>]
 [B<-r> <error percent warn>] [B<-r> <error percent crit>] [B<-a> <seconds>]
 
-suricata_stats_check B<-m> slug [B<-s> <slug>] [B<-l> <log dir>]  [B<-d> <drop percent warn>]
+suricata_stats_check B<-m> slug [B<--slug> <slug>] [B<-l> <log dir>]  [B<-d> <drop percent warn>]
 [B<-D> <drop percent crit>]  [B<-e> <error delta warn>] [B<-E> <error delta crit>]
 [B<-r> <error percent warn>] [B<-r> <error percent crit>] [B<-a> <seconds>]
 
@@ -53,6 +53,12 @@ How far back to read in seconds.
 
 Print the saved cached and exit.
 
+This should be considered depreciated.
+
+The following is more efficient for SNMP.
+
+    extend suricata-stats /bin/cat /var/cache/suricata-monitoring/snmp
+
 =head2 -b
 
 Use the encoded SNMP return for -c.
@@ -75,7 +81,7 @@ Instance name to use in single mode.
 
 Default: ids
 
-=head2 -s <slug>
+=head2 --slug <slug>
 
 The slug to use in slug mode.
 
@@ -294,14 +300,14 @@ if ($version) {
 
 # prints the cache and exists if requested
 if ($print_cache) {
-	my $cache_file='/var/cache/suricata-monitoring/stats.json';
+	my $cache_file = '/var/cache/suricata-monitoring/stats.json';
 	if ($compress) {
-		$cache_file='/var/cache/suricata-monitoring/snmp';
-	} ## end if ($compress)
+		$cache_file = '/var/cache/suricata-monitoring/snmp';
+	}
 	my $cache = read_file($cache_file);
 	print $cache;
 	exit;
-} ## end if ($print_cache)
+}
 
 my $instances = {};
 
@@ -486,13 +492,13 @@ if ( $mode eq 'single' ) {
 
 # put together the args hash
 my $args = {
-	mode               => 'librenms',
-	drop_percent_warn  => $drop_percent_warn,
-	drop_percent_crit  => $drop_percent_crit,
-	error_delta_warn   => $error_delta_warn,
-	error_delta_crit   => $error_delta_crit,
-	files              => $instances,
-	max_age            => $max_age,
+	mode              => 'librenms',
+	drop_percent_warn => $drop_percent_warn,
+	drop_percent_crit => $drop_percent_crit,
+	error_delta_warn  => $error_delta_warn,
+	error_delta_crit  => $error_delta_crit,
+	files             => $instances,
+	max_age           => $max_age,
 };
 
 if ($nagios) {
