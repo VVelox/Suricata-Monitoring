@@ -5,10 +5,7 @@ use warnings;
 use Getopt::Long;
 use File::Slurp;
 use Suricata::Monitoring;
-use MIME::Base64;
-use Hash::Flatten qw(:all);
 use Pod::Usage;
-use IO::Compress::Gzip qw(gzip $GzipError);
 
 =head1 NAME
 
@@ -58,7 +55,7 @@ Print the saved cached and exit.
 
 =head2 -b
 
-When used with -c, gzip the output and convert to base64.
+Use the encoded SNMP return for -c.
 
 =head2 -m <mode>
 
@@ -157,18 +154,6 @@ Default: 1
 Error delta to critical on.
 
 Default: 2
-
-=head2 -r <error percent warn>
-
-Percent of drop packets to warn on.
-
-Default: 0.05%
-
-=head2 -R <error percent crit>
-
-Percent of drop packets to warn on.
-
-Default: 0.1%
 
 =head2 -n
 
@@ -309,19 +294,11 @@ if ($version) {
 
 # prints the cache and exists if requested
 if ($print_cache) {
-	my $cache = read_file('/var/cache/suricata-monitoring/stats.json');
-
+	my $cache_file='/var/cache/suricata-monitoring/stats.json';
 	if ($compress) {
-		my $compressed_string;
-		gzip \$cache => \$compressed_string;
-		my $compressed = encode_base64($compressed_string);
-		$compressed =~ s/\n//g;
-		$compressed = $compressed . "\n";
-		if ( length($compressed) < length($cache) ) {
-			$cache = $compressed;
-		}
+		$cache_file='/var/cache/suricata-monitoring/snmp';
 	} ## end if ($compress)
-
+	my $cache = read_file($cache_file);
 	print $cache;
 	exit;
 } ## end if ($print_cache)
@@ -514,8 +491,6 @@ my $args = {
 	drop_percent_crit  => $drop_percent_crit,
 	error_delta_warn   => $error_delta_warn,
 	error_delta_crit   => $error_delta_crit,
-	error_percent_warn => $error_percent_warn,
-	error_percent_crit => $error_percent_crit,
 	files              => $instances,
 	max_age            => $max_age,
 };
@@ -528,4 +503,3 @@ my $sm       = Suricata::Monitoring->new($args);
 my $returned = $sm->run;
 $sm->print_output;
 exit $returned->{data}{alert};
-

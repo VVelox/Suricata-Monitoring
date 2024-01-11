@@ -10,6 +10,8 @@ use Carp;
 use File::Slurp;
 use Time::Piece;
 use Hash::Flatten qw(:all);
+use MIME::Base64;
+use IO::Compress::Gzip qw(gzip $GzipError);
 
 =head1 NAME
 
@@ -433,14 +435,24 @@ sub run {
 	#
 	eval {
 		my $new_cache = encode_json($to_return);
-		open( my $fh, '>', $previous_file );
-		print $fh $new_cache . "\n";
-		close($fh);
+		write_file($previous_file, $new_cache);
+
+		my $compressed_string;
+		gzip \$new_cache => \$compressed_string;
+		my $compressed = encode_base64($compressed_string);
+		$compressed =~ s/\n//g;
+		$compressed = $compressed . "\n";
+
+		if ( length($compressed) > length($new_cache) ) {
+			write_file($self->{cache_dir}.'/snmp', $new_cache);
+		} else {
+			write_file($self->{cache_dir}.'/snmp', $compressed);
+		}
 	};
 	if ($@) {
 		$to_return->{error}       = '1';
 		$to_return->{data}{alert} = '3';
-		$to_return->{errorString} = 'Failed to write new cache JSON file, "' . $previous_file . '".... ' . $@;
+		$to_return->{errorString} = 'Failed to write new cache JSON and SNMP return files.... ' . $@;
 
 		# set the nagious style alert stuff
 		$to_return->{alert} = '3';
