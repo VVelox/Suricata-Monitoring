@@ -103,23 +103,18 @@ sub new {
 
 	# init the object
 	my $self = {
-		drop_percent_warn  => .75,
-		drop_percent_crit  => 1,
-		error_delta_warn   => 1,
-		error_delta_crit   => 2,
-		error_percent_warn => 0.05,
-		error_percent_crit => 0.1,
-		max_age            => 360,
-		mode               => 'librenms',
-		cache_dir          => '/var/cache/suricata-monitoring/',
+		drop_percent_warn => .75,
+		drop_percent_crit => 1,
+		error_delta_warn  => 1,
+		error_delta_crit  => 2,
+		max_age           => 360,
+		mode              => 'librenms',
+		cache_dir         => '/var/cache/suricata-monitoring/',
 	};
 	bless $self;
 
 	# reel in the numeric args
-	my @num_args = (
-		'drop_percent_warn',  'drop_percent_crit',  'error_delta_warn', 'error_delta_crit',
-		'error_percent_warn', 'error_percent_crit', 'max_age'
-	);
+	my @num_args = ( 'drop_percent_warn', 'drop_percent_crit', 'error_delta_warn', 'error_delta_crit', 'max_age' );
 	for my $num_arg (@num_args) {
 		if ( defined( $args{$num_arg} ) ) {
 			$self->{$num_arg} = $args{$num_arg};
@@ -181,7 +176,7 @@ sub run {
 	# this will be returned
 	my $to_return = {
 		data => {
-			totals      => { drop_percent => 0, drop_percent => 0, },
+			totals      => { drop_percent => 0, drop_percent => 0, error_delta => 0 },
 			instances   => {},
 			alert       => 0,
 			alertString => ''
@@ -313,7 +308,118 @@ sub run {
 		} ## end foreach my $var (@vars)
 	} ## end foreach my $instance (@instances)
 
-	# join any found alerts into the string
+	#
+	#
+	# process error deltas and and look for alerts
+	#
+	#
+	my @totals     = keys( %{ $to_return->{data}{totals} } );
+	my @error_keys = ['file_store__fs_errors'];
+	foreach my $item (@totals) {
+		if ( $item =~ /app_layer__error__[a-zA-Z0-9\-\_]+__gap/ ) {
+			push( @error_keys, $item );
+		}
+	}
+	foreach my $item (@error_keys) {
+		if (   defined($previous)
+			&& defined( $previous->{data} )
+			&& defined( $previous->{data}{totals} )
+			&& defined( $previous->{data}{totals}{$item} ) )
+		{
+			my $delta = $previous->{data}{totals}{$item} - $to_return->{data}{totals}{$item};
+			if ( $delta >= $self->{error_delta_crit} ) {
+				if ( $to_return->{data}{alert} < 2 ) {
+					$to_return->{data}{alert} = 2;
+				}
+				push( @alerts, 'CRITICAL - ' . $item . ' has a error delta greater than ' . $self->{error_delta_crit} );
+			} elsif ( $delta >= $self->{error_delta_warn} ) {
+				if ( $to_return->{data}{alert} < 1 ) {
+					$to_return->{data}{alert} = 1;
+				}
+				push( @alerts, 'WARNING - ' . $item . ' has a error delta greater than ' . $self->{error_delta_warn} );
+			}
+		} ## end if ( defined($previous) && defined( $previous...))
+	} ## end foreach my $item (@error_keys)
+
+	#
+	#
+	# process error deltas and and look for alerts
+	#
+	#
+	my @drop_keys = [ 'capture__kernel_drops', 'capture__kernel_ifdrops' ];
+	foreach my $instance (@instances) {
+		if (   defined($previous)
+			&& defined( $previous->{data} )
+			&& defined( $previous->{data}{instances} )
+			&& defined( $previous->{data}{instances}{$instance} )
+			&& defined( $previous->{data}{instances}{$instance}{capture__kernel_packets} ) )
+		{
+			my $delta = 0;
+			if ( $previous->{data}{instances}{$instance}{capture__kernel_packets}
+				< $to_return->{data}{instances}{$instance}{capture__kernel_packets} )
+			{
+				my $delta = $to_return->{data}{instances}{$instance}{capture__kernel_packets}
+					- $previous->{data}{instances}{$instance}{capture__kernel_packets};
+			} elsif ( $previous->{data}{instances}{$instance}{capture__kernel_packets}
+				> $to_return->{data}{instances}{$instance}{capture__kernel_packets} )
+			{
+				# if previous is greater, it has restarted or rolled over
+				$delta = $to_return->{data}{instances}{$instance}{capture__kernel_packets};
+			}
+
+			if ( $delta > 0 ) {
+				foreach my $item (@drop_keys) {
+					if (   defined($previous)
+						&& defined( $previous->{data} )
+						&& defined( $previous->{data}{instances} )
+						&& defined( $previous->{data}{instances}{$instance} )
+						&& defined( $previous->{data}{instances}{$instance}{$item} ) )
+					{
+						my $drop_delta = 0;
+						if ( $previous->{data}{instances}{$instance}{$item}
+							< $to_return->{data}{instances}{$instance}{$item} )
+						{
+							my $drop_delta = $to_return->{data}{instances}{$instance}{$item}
+								- $previous->{data}{instances}{$instance}{$item};
+						} elsif ( $previous->{data}{instances}{$instance}{$item}
+							> $to_return->{data}{instances}{$instance}{$item} )
+						{
+							# if previous is greater, it has restarted or rolled over
+							$drop_delta = $to_return->{data}{instances}{$instance}{$item};
+						}
+						if ( $drop_delta > 0 ) {
+							my $drop_percent = $drop_delta / $delta;
+							if ( $drop_percent >= $self->{drop_percent_crit} ) {
+								if ( $to_return->{data}{alert} < 2 ) {
+									$to_return->{data}{alert} = 2;
+								}
+								push( @alerts,
+										  'CRITICAL - '
+										. $item
+										. ' has a drop percent greater than '
+										. $self->{drop_percent_crit} );
+							} elsif ( $drop_percent >= $self->{drop_percent_warn} ) {
+								if ( $to_return->{data}{alert} < 1 ) {
+									$to_return->{data}{alert} = 1;
+								}
+								push( @alerts,
+										  'WARNING - '
+										. $item
+										. ' has a error delta greater than '
+										. $self->{drop_percent_warn} );
+							} ## end elsif ( $drop_percent >= $self->{drop_percent_warn...})
+						} ## end if ( $drop_delta > 0 )
+					} ## end if ( defined($previous) && defined( $previous...))
+				} ## end foreach my $item (@drop_keys)
+			} ## end if ( $delta > 0 )
+		} ## end if ( defined($previous) && defined( $previous...))
+	} ## end foreach my $instance (@instances)
+
+	#
+	#
+	# create the error string
+	#
+	#
 	$to_return->{alertString} = join( "\n", @alerts );
 
 	#
@@ -329,7 +435,7 @@ sub run {
 	};
 	if ($@) {
 		$to_return->{error}       = '1';
-		$to_return->{data}{alert}       = '3';
+		$to_return->{data}{alert} = '3';
 		$to_return->{errorString} = 'Failed to write new cache JSON file, "' . $previous_file . '".... ' . $@;
 
 		# set the nagious style alert stuff
