@@ -183,7 +183,7 @@ sub run {
 			alert       => 0,
 			alertString => ''
 		},
-		version     => 1,
+		version     => 2,
 		error       => 0,
 		errorString => '',
 	};
@@ -454,7 +454,7 @@ sub run {
 	foreach my $item (@drop_keys) {
 		my $drop_delta = 0;
 		if ( $previous->{data}{totals}{$item} < $to_return->{data}{totals}{$item} ) {
-			my $drop_delta = $to_return->{data}{totals}{$item} - $previous->{data}{totals}{$item};
+			$drop_delta = $to_return->{data}{totals}{$item} - $previous->{data}{totals}{$item};
 		} elsif ( $previous->{data}{totals}{$item} > $to_return->{data}{totals}{$item} ) {
 			# if previous is greater, it has restarted or rolled over
 			$drop_delta = $to_return->{data}{totals}{$item};
