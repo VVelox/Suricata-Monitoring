@@ -368,7 +368,7 @@ sub run {
 	# process drop precent and and look for alerts
 	#
 	#
-	my @drop_keys = [ 'capture__kernel_drops', 'capture__kernel_ifdrops' ];
+	my @drop_keys = [ 'capture__kernel_drops', 'capture__kernel_ifdrops', 'capture__kernel_any' ];
 	my $delta     = 0;
 	if ( $previous->{data}{totals}{capture__kernel_packets} < $to_return->{data}{totals}{capture__kernel_packets} ) {
 		my $delta
@@ -378,8 +378,9 @@ sub run {
 		# if previous is greater, it has restarted or rolled over
 		$delta = $to_return->{data}{totals}{capture__kernel_packets};
 	}
+	$to_return->{data}{totals}{capture__kernel_drops_any}
+		= $to_return->{data}{totals}{capture__kernel_drops} + $to_return->{data}{totals}{capture__kernel_ifdrops};
 	# if delta is 0, then there is no point in checking
-	$to_return->{data}{totals}{drop_percent} = 0;
 	if ( $delta > 0 ) {
 		foreach my $item (@drop_keys) {
 			my $drop_delta = 0;
@@ -391,7 +392,9 @@ sub run {
 			}
 			if ( $drop_delta > 0 ) {
 				my $drop_percent = $drop_delta / $delta;
-				$to_return->{data}{totals}{drop_percent} = $drop_percent;
+				if ($to_return->{data}{totals}{drop_percent} < $drop_percent) {
+					$to_return->{data}{totals}{drop_percent} = $drop_percent;
+				}
 				if ( $drop_percent >= $self->{drop_percent_crit} ) {
 					if ( $to_return->{data}{alert} < 2 ) {
 						$to_return->{data}{alert} = 2;
@@ -553,7 +556,7 @@ L<https://github.com/VVelox/Suricata-Monitoring>
 
 =head1 LICENSE AND COPYRIGHT
 
-This software is Copyright (c) 2022 by Zane C. Bowers-Hadley.
+This software is Copyright (c) 2024 by Zane C. Bowers-Hadley.
 
 This is free software, licensed under:
 
