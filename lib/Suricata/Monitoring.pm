@@ -369,80 +369,7 @@ sub run {
 	#
 	#
 	my @drop_keys = [ 'capture__kernel_drops', 'capture__kernel_ifdrops' ];
-	foreach my $instance (@instances) {
-		if (   defined($previous)
-			&& defined( $previous->{data} )
-			&& defined( $previous->{data}{instances} )
-			&& defined( $previous->{data}{instances}{$instance} )
-			&& defined( $previous->{data}{instances}{$instance}{capture__kernel_packets} ) )
-		{
-			my $delta = 0;
-			if ( $previous->{data}{instances}{$instance}{capture__kernel_packets}
-				< $to_return->{data}{instances}{$instance}{capture__kernel_packets} )
-			{
-				my $delta = $to_return->{data}{instances}{$instance}{capture__kernel_packets}
-					- $previous->{data}{instances}{$instance}{capture__kernel_packets};
-			} elsif ( $previous->{data}{instances}{$instance}{capture__kernel_packets}
-				> $to_return->{data}{instances}{$instance}{capture__kernel_packets} )
-			{
-				# if previous is greater, it has restarted or rolled over
-				$delta = $to_return->{data}{instances}{$instance}{capture__kernel_packets};
-			}
-
-			if ( $delta > 0 ) {
-				foreach my $item (@drop_keys) {
-					if (   defined($previous)
-						&& defined( $previous->{data} )
-						&& defined( $previous->{data}{instances} )
-						&& defined( $previous->{data}{instances}{$instance} )
-						&& defined( $previous->{data}{instances}{$instance}{$item} ) )
-					{
-						my $drop_delta = 0;
-						if ( $previous->{data}{instances}{$instance}{$item}
-							< $to_return->{data}{instances}{$instance}{$item} )
-						{
-							my $drop_delta = $to_return->{data}{instances}{$instance}{$item}
-								- $previous->{data}{instances}{$instance}{$item};
-						} elsif ( $previous->{data}{instances}{$instance}{$item}
-							> $to_return->{data}{instances}{$instance}{$item} )
-						{
-							# if previous is greater, it has restarted or rolled over
-							$drop_delta = $to_return->{data}{instances}{$instance}{$item};
-						}
-						if ( $drop_delta > 0 ) {
-							my $drop_percent = $drop_delta / $delta;
-							$to_return->{data}{instances}{$instance}{drop_percent} = $drop_percent;
-							if ( $drop_percent >= $self->{drop_percent_crit} ) {
-								if ( $to_return->{data}{alert} < 2 ) {
-									$to_return->{data}{alert} = 2;
-								}
-								push( @alerts,
-										  'CRITICAL - '
-										. $item
-										. ' for instance '
-										. $instance
-										. ' has a drop percent greater than '
-										. $self->{drop_percent_crit} );
-							} elsif ( $drop_percent >= $self->{drop_percent_warn} ) {
-								if ( $to_return->{data}{alert} < 1 ) {
-									$to_return->{data}{alert} = 1;
-								}
-								push( @alerts,
-										  'WARNING - '
-										. $item
-										. ' for instance '
-										. $instance
-										. ' has a drop percent greater than '
-										. $self->{drop_percent_warn} );
-							} ## end elsif ( $drop_percent >= $self->{drop_percent_warn...})
-						} ## end if ( $drop_delta > 0 )
-					} ## end if ( defined($previous) && defined( $previous...))
-				} ## end foreach my $item (@drop_keys)
-			} ## end if ( $delta > 0 )
-		} ## end if ( defined($previous) && defined( $previous...))
-	} ## end foreach my $instance (@instances)
-
-	my $delta = 0;
+	my $delta     = 0;
 	if ( $previous->{data}{totals}{capture__kernel_packets} < $to_return->{data}{totals}{capture__kernel_packets} ) {
 		my $delta
 			= $to_return->{data}{totals}{capture__kernel_packets} - $previous->{data}{totals}{capture__kernel_packets};
@@ -451,38 +378,42 @@ sub run {
 		# if previous is greater, it has restarted or rolled over
 		$delta = $to_return->{data}{totals}{capture__kernel_packets};
 	}
-	foreach my $item (@drop_keys) {
-		my $drop_delta = 0;
-		if ( $previous->{data}{totals}{$item} < $to_return->{data}{totals}{$item} ) {
-			$drop_delta = $to_return->{data}{totals}{$item} - $previous->{data}{totals}{$item};
-		} elsif ( $previous->{data}{totals}{$item} > $to_return->{data}{totals}{$item} ) {
-			# if previous is greater, it has restarted or rolled over
-			$drop_delta = $to_return->{data}{totals}{$item};
-		}
-		if ( $drop_delta > 0 ) {
-			my $drop_percent = $drop_delta / $delta;
-			$to_return->{data}{totals}{drop_percent} = $drop_percent;
-			if ( $drop_percent >= $self->{drop_percent_crit} ) {
-				if ( $to_return->{data}{alert} < 2 ) {
-					$to_return->{data}{alert} = 2;
-				}
-				push( @alerts,
-						  'CRITICAL - '
-						. $item
-						. ' for totals has a drop percent greater than '
-						. $self->{drop_percent_crit} );
-			} elsif ( $drop_percent >= $self->{drop_percent_warn} ) {
-				if ( $to_return->{data}{alert} < 1 ) {
-					$to_return->{data}{alert} = 1;
-				}
-				push( @alerts,
-						  'WARNING - '
-						. $item
-						. ' for totals has a drop percent greater than '
-						. $self->{drop_percent_warn} );
-			} ## end elsif ( $drop_percent >= $self->{drop_percent_warn...})
-		} ## end if ( $drop_delta > 0 )
-	} ## end foreach my $item (@drop_keys)
+	# if delta is 0, then there is no point in checking
+	$to_return->{data}{totals}{drop_percent} = 0;
+	if ( $delta > 0 ) {
+		foreach my $item (@drop_keys) {
+			my $drop_delta = 0;
+			if ( $previous->{data}{totals}{$item} < $to_return->{data}{totals}{$item} ) {
+				$drop_delta = $to_return->{data}{totals}{$item} - $previous->{data}{totals}{$item};
+			} elsif ( $previous->{data}{totals}{$item} > $to_return->{data}{totals}{$item} ) {
+				# if previous is greater, it has restarted or rolled over
+				$drop_delta = $to_return->{data}{totals}{$item};
+			}
+			if ( $drop_delta > 0 ) {
+				my $drop_percent = $drop_delta / $delta;
+				$to_return->{data}{totals}{drop_percent} = $drop_percent;
+				if ( $drop_percent >= $self->{drop_percent_crit} ) {
+					if ( $to_return->{data}{alert} < 2 ) {
+						$to_return->{data}{alert} = 2;
+					}
+					push( @alerts,
+							  'CRITICAL - '
+							. $item
+							. ' for totals has a drop percent greater than '
+							. $self->{drop_percent_crit} );
+				} elsif ( $drop_percent >= $self->{drop_percent_warn} ) {
+					if ( $to_return->{data}{alert} < 1 ) {
+						$to_return->{data}{alert} = 1;
+					}
+					push( @alerts,
+							  'WARNING - '
+							. $item
+							. ' for totals has a drop percent greater than '
+							. $self->{drop_percent_warn} );
+				} ## end elsif ( $drop_percent >= $self->{drop_percent_warn...})
+			} ## end if ( $drop_delta > 0 )
+		} ## end foreach my $item (@drop_keys)
+	} ## end if ( $delta > 0 )
 
 	#
 	#
