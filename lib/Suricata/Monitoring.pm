@@ -323,25 +323,23 @@ sub run {
 		}
 	}
 	foreach my $item (@error_keys) {
-		if (   defined($previous)
-			&& defined( $previous->{data} )
-			&& defined( $previous->{data}{totals} )
-			&& defined( $previous->{data}{totals}{$item} ) )
-		{
-			my $delta = $previous->{data}{totals}{$item} - $to_return->{data}{totals}{$item};
-			if ( $delta >= $self->{error_delta_crit} ) {
-				if ( $to_return->{data}{alert} < 2 ) {
-					$to_return->{data}{alert} = 2;
-				}
-				push( @alerts, 'CRITICAL - ' . $item . ' has a error delta greater than ' . $self->{error_delta_crit} );
-			} elsif ( $delta >= $self->{error_delta_warn} ) {
-				if ( $to_return->{data}{alert} < 1 ) {
-					$to_return->{data}{alert} = 1;
-				}
-				push( @alerts, 'WARNING - ' . $item . ' has a error delta greater than ' . $self->{error_delta_warn} );
+		my $delta = $previous->{data}{totals}{$item} - $to_return->{data}{totals}{$item};
+		# if less than zero, then it has been restarted or clicked over
+		if ( $delta < 0 ) {
+			$delta = $to_return->{data}{totals}{$item};
+		}
+		if ( $delta >= $self->{error_delta_crit} ) {
+			if ( $to_return->{data}{alert} < 2 ) {
+				$to_return->{data}{alert} = 2;
 			}
-			$to_return->{data}{totals}{error_delta} = $to_return->{data}{totals}{error_delta} + $delta;
-		} ## end if ( defined($previous) && defined( $previous...))
+			push( @alerts, 'CRITICAL - ' . $item . ' has a error delta greater than ' . $self->{error_delta_crit} );
+		} elsif ( $delta >= $self->{error_delta_warn} ) {
+			if ( $to_return->{data}{alert} < 1 ) {
+				$to_return->{data}{alert} = 1;
+			}
+			push( @alerts, 'WARNING - ' . $item . ' has a error delta greater than ' . $self->{error_delta_warn} );
+		}
+		$to_return->{data}{totals}{error_delta} = $to_return->{data}{totals}{error_delta} + $delta;
 	} ## end foreach my $item (@error_keys)
 	if ( $to_return->{data}{totals}{error_delta} >= $self->{error_delta_crit} ) {
 		if ( $to_return->{data}{alert} < 2 ) {
