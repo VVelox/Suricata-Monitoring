@@ -316,7 +316,7 @@ sub run {
 	#
 	#
 	my @totals     = keys( %{ $to_return->{data}{totals} } );
-	my @error_keys = ['file_store__fs_errors'];
+	my @error_keys = ('file_store__fs_errors');
 	foreach my $item (@totals) {
 		if ( $item =~ /app_layer__error__[a-zA-Z0-9\-\_]+__gap/ ) {
 			push( @error_keys, $item );
