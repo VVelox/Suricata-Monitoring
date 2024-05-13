@@ -366,7 +366,7 @@ sub run {
 	# process drop precent and and look for alerts
 	#
 	#
-	my @drop_keys = [ 'capture__kernel_drops', 'capture__kernel_ifdrops', 'capture__kernel_drops_any' ];
+	my @drop_keys = ( 'capture__kernel_drops', 'capture__kernel_ifdrops', 'capture__kernel_drops_any' );
 	# if this previous greater than or equal, almost certain it rolled over or restarted, so detla is zero
 	my $delta
 		= $to_return->{data}{totals}{capture__kernel_packets} - $previous->{data}{totals}{capture__kernel_packets};
