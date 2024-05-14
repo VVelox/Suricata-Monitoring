@@ -153,11 +153,15 @@ Default: 1%
 
 Error delta to warn on.
 
+This is in errors/second. So 1 would be 1 error a second.
+
 Default: 1
 
 =head2 -E <error delta crit>
 
 Error delta to critical on.
+
+This is in errors/second. So 2 would be 2 error a second.
 
 Default: 2
 

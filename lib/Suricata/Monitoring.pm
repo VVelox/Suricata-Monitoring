@@ -67,10 +67,10 @@ The only must have is 'files'.
     - drop_percent_crit :: Drop percent critical threshold.
       - Default :: 1
 
-    - error_delta_warn :: Error delta warning threshold.
+    - error_delta_warn :: Error delta warning threshold. In errors/second.
       - Default :: 1
 
-    - error_delta_crit :: Error delta critical threshold.
+    - error_delta_crit :: Error delta critical threshold. In errors/second.
       - Default :: 2
 
     - max_age :: How far back to read in seconds.
@@ -328,6 +328,11 @@ sub run {
 		if ( $delta < 0 ) {
 			$delta = $to_return->{data}{totals}{$item};
 		}
+		$to_return->{data}{totals}{error_delta} = $to_return->{data}{totals}{error_delta} + $delta;
+		# this expects to work in 5 minute increments so convert to errors per second
+		if ( $delta != 0 ) {
+			$to_return->{data}{totals}{error_delta} = $to_return->{data}{totals}{error_delta} + $delta;
+		}
 		if ( $delta >= $self->{error_delta_crit} ) {
 			if ( $to_return->{data}{alert} < 2 ) {
 				$to_return->{data}{alert} = 2;
@@ -339,8 +344,11 @@ sub run {
 			}
 			push( @alerts, 'WARNING - ' . $item . ' has a error delta greater than ' . $self->{error_delta_warn} );
 		}
-		$to_return->{data}{totals}{error_delta} = $to_return->{data}{totals}{error_delta} + $delta;
 	} ## end foreach my $item (@error_keys)
+	# this expects to work in 5 minute increments so convert to errors per second
+	if ( $to_return->{data}{totals}{error_delta} != 0 ) {
+		$to_return->{data}{totals}{error_delta} = $to_return->{data}{totals}{error_delta} / 300;
+	}
 	if ( $to_return->{data}{totals}{error_delta} >= $self->{error_delta_crit} ) {
 		if ( $to_return->{data}{alert} < 2 ) {
 			$to_return->{data}{alert} = 2;
