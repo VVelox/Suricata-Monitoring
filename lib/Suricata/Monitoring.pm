@@ -398,8 +398,10 @@ sub run {
 				$drop_delta = $to_return->{data}{totals}{$item};
 			}
 		} else {
-			# delta is zero, it has restarted or rolled over
-			$drop_delta = $to_return->{data}{totals}{$item};
+			if (defined($to_return->{data}{totals}{$item})) {
+				# delta is zero, it has restarted or rolled over
+				$drop_delta = $to_return->{data}{totals}{$item};
+			}
 		}
 		if ( $drop_delta > 0 ) {
 			my $drop_percent = $drop_delta / $delta;
