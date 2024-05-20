@@ -376,15 +376,22 @@ sub run {
 	#
 	my @drop_keys = ( 'capture__kernel_drops', 'capture__kernel_ifdrops', 'capture__kernel_drops_any' );
 	# if this previous greater than or equal, almost certain it rolled over or restarted, so detla is zero
-	my $delta
-		= $to_return->{data}{totals}{capture__kernel_packets} - $previous->{data}{totals}{capture__kernel_packets};
+	my $delta = $to_return->{data}{totals}{capture__kernel_packets};
+	if ( defined( $previous->{data}{totals}{capture__kernel_packets} ) ) {
+		$delta
+			= $to_return->{data}{totals}{capture__kernel_packets} - $previous->{data}{totals}{capture__kernel_packets};
+	}
 	$to_return->{data}{totals}{capture__kernel_drops_any}
 		= $to_return->{data}{totals}{capture__kernel_drops} + $to_return->{data}{totals}{capture__kernel_ifdrops};
 	# if delta is 0, then there previous is zero
 	foreach my $item (@drop_keys) {
 		my $drop_delta = 0;
 		if ( $delta > 0 ) {
-			$drop_delta = $to_return->{data}{totals}{$item} - $previous->{data}{totals}{$item};
+			if ( defined( $previous->{data}{totals}{$item} ) ) {
+				$drop_delta = $to_return->{data}{totals}{$item} - $previous->{data}{totals}{$item};
+			} else {
+				$drop_delta = $to_return->{data}{totals}{$item};
+			}
 		} else {
 			# delta is zero, it has restarted or rolled over
 			$drop_delta = $to_return->{data}{totals}{$item};
