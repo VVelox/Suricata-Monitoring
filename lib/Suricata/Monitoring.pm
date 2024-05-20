@@ -381,8 +381,13 @@ sub run {
 		$delta
 			= $to_return->{data}{totals}{capture__kernel_packets} - $previous->{data}{totals}{capture__kernel_packets};
 	}
-	$to_return->{data}{totals}{capture__kernel_drops_any}
-		= $to_return->{data}{totals}{capture__kernel_drops} + $to_return->{data}{totals}{capture__kernel_ifdrops};
+	$to_return->{data}{totals}{capture__kernel_drops_any} = 0;
+	if (defined($to_return->{data}{totals}{capture__kernel_drops})) {
+		$to_return->{data}{totals}{capture__kernel_drops_any} += $to_return->{data}{totals}{capture__kernel_drops};
+	}
+	if (defined($to_return->{data}{totals}{capture__kernel_ifdrops})) {
+		$to_return->{data}{totals}{capture__kernel_drops_any} += $to_return->{data}{totals}{capture__kernel_ifdrops};
+	}
 	# if delta is 0, then there previous is zero
 	foreach my $item (@drop_keys) {
 		my $drop_delta = 0;
