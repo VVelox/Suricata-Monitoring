@@ -1,6 +1,6 @@
 Revision history for Suricata-Monitoring
 
-1.1.0   2026-11-18/
+1.1.0   2026-11-19/10:00
         - Update to Suricata 8.0.
         - Handle zero counters omitted via null-values.
         - Support AF_XDP, DPDK, DAG, and Napatech packet/drop counters.
